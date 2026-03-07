@@ -25,10 +25,10 @@ const UnitDetailPage = () => {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [form] = Form.useForm();
 
-  // Check permissions
-  const canCreateIP = hasPermission(user?.roles, Permissions.IP_CREATE);
-  const canUpdateIP = hasPermission(user?.roles, Permissions.IP_UPDATE);
-  const canDeleteIP = hasPermission(user?.roles, Permissions.IP_DELETE);
+  // Check permissions (dùng Unified Roles - level cao nhất trong units áp dụng toàn hệ thống)
+  const canCreateIP = hasPermission(user, Permissions.IP_CREATE);
+  const canUpdateIP = hasPermission(user, Permissions.IP_UPDATE);
+  const canDeleteIP = hasPermission(user, Permissions.IP_DELETE);
 
   useEffect(() => {
     if (id) {

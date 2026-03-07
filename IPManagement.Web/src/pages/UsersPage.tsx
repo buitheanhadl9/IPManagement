@@ -4,10 +4,12 @@ import { PlusOutlined, EditOutlined, SearchOutlined, ReloadOutlined, PlusCircleO
 import type { User, UserCreateRequest, UserUpdateRequest, UserUnitAssignmentRequest } from '../types/user';
 import { userService } from '../services/user.service';
 import { unitService } from '../services/unit.service';
+import { roleService } from '../services/role.service';
 import type { Unit } from '../types/unit';
+import type { Role } from '../types/role';
 import { format } from 'date-fns';
 import { useAppSelector } from '../hooks/useAppSelector';
-import { hasPermission, Permissions, isAdmin } from '../utils/permissions';
+import { isAdmin } from '../utils/permissions';
 import { authService } from '../services/auth.service';
 
 const { Title } = Typography;
@@ -15,7 +17,6 @@ const { Search } = Input;
 
 interface UnitAssignmentForm {
   unitId: number;
-  role: string;
   isPrimary: boolean;
 }
 
@@ -23,13 +24,14 @@ const UsersPage = () => {
   const user = useAppSelector((state) => state.auth.user);
   const [users, setUsers] = useState<User[]>([]);
   const [units, setUnits] = useState<{ id: number; name: string }[]>([]);
+  const [systemRoles, setSystemRoles] = useState<Role[]>([]);
   const [loading, setLoading] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form] = Form.useForm();
   const [resetPasswordModalVisible, setResetPasswordModalVisible] = useState(false);
   const [resetPasswordUserId, setResetPasswordUserId] = useState<string | null>(null);
-  const [resetPasswordLoading, setResetPasswordLoading] = useState(false);
+  const [_resetPasswordLoading, setResetPasswordLoading] = useState(false);
   const [resetPasswordForm] = Form.useForm();
   const [searchTerm, setSearchTerm] = useState('');
   const [unitFilter, setUnitFilter] = useState<number | null>(null);
@@ -38,16 +40,27 @@ const UsersPage = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [unitAssignments, setUnitAssignments] = useState<UnitAssignmentForm[]>([]);
+  const [assignAllUnits, setAssignAllUnits] = useState(false);
 
   // Check permissions - only Admin can create, update, delete users
-  const canCreateUser = isAdmin(user?.roles);
-  const canUpdateUser = isAdmin(user?.roles);
-  const canDeleteUser = isAdmin(user?.roles);
+  const canCreateUser = isAdmin(user);
+  const canUpdateUser = isAdmin(user);
+  const canDeleteUser = isAdmin(user);
 
   useEffect(() => {
     fetchUsers();
     fetchUnits();
+    fetchSystemRoles();
   }, [currentPage, pageSize, unitFilter, roleFilter]);
+
+  const fetchSystemRoles = async () => {
+    try {
+      const roleList = await roleService.getAllRoles();
+      setSystemRoles(roleList);
+    } catch (error) {
+      console.error('Failed to fetch system roles:', error);
+    }
+  };
 
   const fetchUsers = async () => {
     setLoading(true);
@@ -80,8 +93,8 @@ const UsersPage = () => {
 
   const fetchUnits = async () => {
     try {
-      const response = await unitService.getAllUnits();
-      setUnits(response.map((u: Unit) => ({ id: u.id, name: u.name })));
+      const response = await unitService.getAllUnitsForSelection();
+      setUnits(response.map((u) => ({ id: u.id, name: u.name })));
     } catch (error) {
       console.error('Failed to fetch units:', error);
     }
@@ -96,6 +109,9 @@ const UsersPage = () => {
     form.resetFields();
     form.setFieldsValue({ roles: [], isActive: true });
     setUnitAssignments([]);
+    setAssignAllUnits(false);
+    // Refresh roles khi mở modal để đảm bảo có role mới
+    fetchSystemRoles();
     setModalVisible(true);
   };
 
@@ -119,6 +135,9 @@ const UsersPage = () => {
       isPrimary: u.isPrimary
     })) || [];
     setUnitAssignments(assignments);
+    setAssignAllUnits(record.units && record.units.length === units.length);
+    // Refresh roles khi mở modal để đảm bảo có role mới
+    fetchSystemRoles();
     setModalVisible(true);
   };
 
@@ -137,7 +156,7 @@ const UsersPage = () => {
   };
 
   const handleResetPassword = (userId: string) => {
-    if (!isAdmin(user?.roles)) {
+    if (!isAdmin(user)) {
       message.error('Chỉ Admin mới được đổi mật khẩu cho user khác.');
       return;
     }
@@ -163,6 +182,7 @@ const UsersPage = () => {
     }
 
     setResetPasswordLoading(true);
+    void _resetPasswordLoading; // Mark as used
     try {
       await authService.adminResetPassword(resetPasswordUserId, values.newPassword);
       message.success('Đổi mật khẩu thành công');
@@ -181,7 +201,7 @@ const UsersPage = () => {
       message.error('Bạn không có quyền chỉnh sửa user.');
       return;
     }
-    setUnitAssignments([...unitAssignments, { unitId: 0, role: 'User', isPrimary: false }]);
+    setUnitAssignments([...unitAssignments, { unitId: 0, isPrimary: false }]);
   };
 
   const removeUnitAssignment = (index: number) => {
@@ -219,12 +239,25 @@ const UsersPage = () => {
       return;
     }
     try {
-      // Chuẩn hóa unitAssignments
-      const formattedAssignments: UserUnitAssignmentRequest[] = unitAssignments
+      // Nếu checkbox "Assign All Units" được tích, gán tất cả units
+      let assignmentsToUse = unitAssignments;
+      if (assignAllUnits && units.length > 0) {
+        assignmentsToUse = units.map(u => ({
+          unitId: u.id,
+          isPrimary: false
+        }));
+        // Đặt unit đầu tiên là primary
+        if (assignmentsToUse.length > 0) {
+          assignmentsToUse[0].isPrimary = true;
+        }
+      }
+      
+      // Chuẩn hóa unitAssignments (role mặc định là "User" - không dùng nữa)
+      const formattedAssignments: UserUnitAssignmentRequest[] = assignmentsToUse
         .filter(a => a.unitId !== 0)
         .map(a => ({
           unitId: a.unitId,
-          role: a.role,
+          role: 'User', // Role mặc định, không dùng trong Unified Roles mới
           isPrimary: a.isPrimary
         }));
 
@@ -243,7 +276,9 @@ const UsersPage = () => {
       setModalVisible(false);
       form.resetFields();
       setUnitAssignments([]);
+      setAssignAllUnits(false);
       fetchUsers();
+      fetchSystemRoles(); // Refresh roles sau khi save
     } catch (error: any) {
       console.error('Failed to save user:', error);
       const errorMessage = error?.response?.data?.message || error?.message || 'Unknown error';
@@ -309,7 +344,7 @@ const UsersPage = () => {
       render: (roles: string[]) => (
         <Space wrap>
           {roles.map((role) => (
-            <Tag key={role} color={role === 'Admin' ? 'red' : role === 'UnitAdmin' ? 'blue' : 'green'}>
+            <Tag key={role} color={role === 'Admin' ? 'red' : role === 'Manager' ? 'blue' : 'green'}>
               {role}
             </Tag>
           ))}
@@ -341,7 +376,7 @@ const UsersPage = () => {
       fixed: 'right' as const,
       render: (_: unknown, record: User) => (
         <Space>
-          {isAdmin(user?.roles) && (
+          {isAdmin(user) && (
             <Button
               icon={<LockOutlined />}
               onClick={() => handleResetPassword(record.id)}
@@ -427,7 +462,7 @@ const UsersPage = () => {
               style={{ width: '100%' }}
             >
               <Select.Option value="Admin">Admin</Select.Option>
-              <Select.Option value="UnitAdmin">Unit Admin</Select.Option>
+              <Select.Option value="Manager">Manager</Select.Option>
               <Select.Option value="User">User</Select.Option>
             </Select>
           </Col>
@@ -462,7 +497,14 @@ const UsersPage = () => {
       <Modal
         title={editingId ? 'Edit User' : 'Add User'}
         open={modalVisible}
-        onCancel={() => { setModalVisible(false); form.resetFields(); setUnitAssignments([]); }}
+        onCancel={() => {
+          setModalVisible(false);
+          form.resetFields();
+          setUnitAssignments([]);
+          setAssignAllUnits(false);
+          // Refresh roles khi đóng modal
+          fetchSystemRoles();
+        }}
         onOk={() => form.submit()}
         width={700}
         bodyStyle={{ maxHeight: '80vh', overflowY: 'auto' }}
@@ -516,7 +558,7 @@ const UsersPage = () => {
               {unitAssignments.map((assignment, index) => (
                 <Card key={index} size="small" style={{ padding: '8px 16px' }}>
                   <Row gutter={16} align="middle">
-                    <Col span={10}>
+                    <Col span={17}>
                       <Select
                         placeholder="Select unit"
                         value={assignment.unitId || undefined}
@@ -524,25 +566,23 @@ const UsersPage = () => {
                         style={{ width: '100%' }}
                         showSearch
                         optionFilterProp="children"
+                        filterOption={(input, option) =>
+                          (option?.label as string)?.toLowerCase().includes(input.toLowerCase())
+                        }
                       >
-                        {units.map((unit) => (
-                          <Select.Option key={unit.id} value={unit.id}>{unit.name}</Select.Option>
-                        ))}
+                        {units
+                          .filter((unit) => {
+                            // Hiển thị unit nếu:
+                            // 1. Unit này đang được chọn ở dòng hiện tại, HOẶC
+                            // 2. Unit này chưa được chọn ở bất kỳ dòng nào khác
+                            return assignment.unitId === unit.id || !unitAssignments.some((a, i) => a.unitId === unit.id && i !== index);
+                          })
+                          .map((unit) => (
+                            <Select.Option key={unit.id} value={unit.id}>{unit.name}</Select.Option>
+                          ))}
                       </Select>
                     </Col>
-                    <Col span={8}>
-                      <Select
-                        placeholder="Role"
-                        value={assignment.role}
-                        onChange={(value) => updateUnitAssignment(index, 'role', value)}
-                        style={{ width: '100%' }}
-                      >
-                        <Select.Option value="User">User</Select.Option>
-                        <Select.Option value="UnitAdmin">Unit Admin</Select.Option>
-                        <Select.Option value="Admin">Admin</Select.Option>
-                      </Select>
-                    </Col>
-                    <Col span={4}>
+                    <Col span={5}>
                       <Checkbox
                         checked={assignment.isPrimary}
                         onChange={(e) => updateUnitAssignment(index, 'isPrimary', e.target.checked)}
@@ -551,8 +591,8 @@ const UsersPage = () => {
                       </Checkbox>
                     </Col>
                     <Col span={2}>
-                      <Button 
-                        icon={<DeleteCircleOutlined />} 
+                      <Button
+                        icon={<DeleteCircleOutlined />}
                         onClick={() => removeUnitAssignment(index)}
                         size="small"
                         danger
@@ -561,14 +601,33 @@ const UsersPage = () => {
                   </Row>
                 </Card>
               ))}
-              <Button 
-                type="dashed" 
-                onClick={addUnitAssignment} 
+              <Button
+                type="dashed"
+                onClick={addUnitAssignment}
                 icon={<PlusCircleOutlined />}
                 style={{ width: '100%' }}
               >
                 Add Unit
               </Button>
+              <Checkbox
+                checked={assignAllUnits}
+                onChange={(e) => {
+                  setAssignAllUnits(e.target.checked);
+                  if (e.target.checked) {
+                    // Tự động gán tất cả units khi tích checkbox
+                    const allAssignments = units.map((u, idx) => ({
+                      unitId: u.id,
+                      isPrimary: idx === 0 // Unit đầu tiên là primary
+                    }));
+                    setUnitAssignments(allAssignments);
+                  } else {
+                    // Xóa tất cả assignments khi bỏ tích
+                    setUnitAssignments([]);
+                  }
+                }}
+              >
+                Assign All Units
+              </Checkbox>
             </Space>
           </Form.Item>
 
@@ -578,9 +637,9 @@ const UsersPage = () => {
             tooltip="Roles that apply across all units"
           >
             <Select mode="multiple" placeholder="Select system roles">
-              <Select.Option value="Admin">Admin</Select.Option>
-              <Select.Option value="UnitAdmin">Unit Admin</Select.Option>
-              <Select.Option value="User">User</Select.Option>
+              {systemRoles.map((role) => (
+                <Select.Option key={role.name} value={role.name}>{role.name}</Select.Option>
+              ))}
             </Select>
           </Form.Item>
 

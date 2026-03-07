@@ -1,5 +1,6 @@
 using IPManagement.API.Data;
 using IPManagement.API.DTOs;
+using IPManagement.API.Extensions;
 using IPManagement.API.Models;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -12,6 +13,7 @@ using System.Security.Cryptography;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using System.Collections.Generic;
 
 namespace IPManagement.API.Services
 {
@@ -93,6 +95,9 @@ namespace IPManagement.API.Services
                 .Select(ua => ua.Unit.Name)
                 .FirstOrDefault();
 
+            // Get user permissions
+            var permissions = await _userManager.GetPermissionsAsync(user, _context);
+
             return new LoginResponse
             {
                 Token = token,
@@ -107,7 +112,8 @@ namespace IPManagement.API.Services
                     Phone = user.Phone,
                     Units = unitAssignments,
                     UnitName = primaryUnitName,
-                    Roles = roles.ToArray()
+                    Roles = roles.ToArray(),
+                    Permissions = permissions.ToArray()
                 }
             };
         }
@@ -140,6 +146,9 @@ namespace IPManagement.API.Services
                 })
                 .ToArray();
 
+            // Get user permissions
+            var permissions = await _userManager.GetPermissionsAsync(user, _context);
+
             return new UserDetailDto
             {
                 Id = Guid.Parse(user.Id),
@@ -149,6 +158,7 @@ namespace IPManagement.API.Services
                 Phone = user.Phone,
                 Units = unitAssignments,
                 Roles = roles.ToArray(),
+                Permissions = permissions.ToArray(),
                 IsActive = user.IsActive,
                 CreatedAt = user.CreatedAt,
                 UpdatedAt = user.UpdatedAt,
@@ -158,6 +168,7 @@ namespace IPManagement.API.Services
 
         public async Task<UserDetailDto?> GetCurrentUserAsync(Guid userId)
         {
+            // GetUserByIdAsync already includes permissions
             return await GetUserByIdAsync(userId);
         }
 
@@ -179,6 +190,16 @@ namespace IPManagement.API.Services
             var roles = _userManager.GetRolesAsync(user).Result;
             var roleClaims = roles.Select(role => new Claim(ClaimTypes.Role, role)).ToArray();
 
+            // Get permissions from database based on user's roles
+            var permissions = _context.RolePermissions
+                .AsNoTracking()
+                .Where(rp => roles.Contains(rp.RoleName))
+                .Select(rp => rp.Permission)
+                .Distinct()
+                .ToList();
+
+            var permissionClaims = permissions.Select(p => new Claim("permission", p));
+
             var claims = new[]
             {
                 new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
@@ -186,7 +207,7 @@ namespace IPManagement.API.Services
                 new Claim(ClaimTypes.Email, user.Email!),
                 new Claim("FullName", user.FullName ?? string.Empty),
                 new Claim("UnitId", user.UnitId?.ToString() ?? string.Empty)
-            }.Concat(roleClaims);
+            }.Concat(roleClaims).Concat(permissionClaims);
 
             var token = new JwtSecurityToken(
                 issuer: _jwtSettings.Issuer,

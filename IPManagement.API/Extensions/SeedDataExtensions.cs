@@ -4,11 +4,63 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using IPManagement.API.Data;
 using IPManagement.API.Models;
+using IPManagement.API;
 
 namespace IPManagement.API.Extensions;
 
 public static class SeedDataExtensions
 {
+    private static async Task SeedRolePermissionsAsync(ApplicationDbContext context, ILogger logger)
+    {
+        // Check if already seeded
+        if (context.RolePermissions.Any())
+        {
+            logger.LogInformation("Role permissions already seeded, skipping...");
+            return;
+        }
+
+        // Admin has all permissions
+        var adminPermissions = new[]
+        {
+            Permissions.IpCreate, Permissions.IpRead, Permissions.IpUpdate, Permissions.IpDelete,
+            Permissions.UnitCreate, Permissions.UnitRead, Permissions.UnitUpdate, Permissions.UnitDelete,
+            Permissions.UserCreate, Permissions.UserRead, Permissions.UserUpdate, Permissions.UserDelete,
+            Permissions.RoleCreate, Permissions.RoleRead, Permissions.RoleUpdate, Permissions.RoleDelete
+        };
+
+        foreach (var permission in adminPermissions)
+        {
+            context.RolePermissions.Add(new RolePermission { RoleName = "Admin", Permission = permission });
+        }
+
+        // Manager has IP permissions and read-only for units/users
+        var managerPermissions = new[]
+        {
+            Permissions.IpCreate, Permissions.IpRead, Permissions.IpUpdate, Permissions.IpDelete,
+            Permissions.UnitRead,
+            Permissions.UserRead
+        };
+
+        foreach (var permission in managerPermissions)
+        {
+            context.RolePermissions.Add(new RolePermission { RoleName = "Manager", Permission = permission });
+        }
+
+        // User has read-only permissions
+        var userPermissions = new[]
+        {
+            Permissions.IpRead, Permissions.UnitRead, Permissions.UserRead, Permissions.RoleRead
+        };
+
+        foreach (var permission in userPermissions)
+        {
+            context.RolePermissions.Add(new RolePermission { RoleName = "User", Permission = permission });
+        }
+
+        await context.SaveChangesAsync();
+        logger.LogInformation("Seeded role permissions for Admin, Manager, and User roles");
+    }
+
     public static async Task SeedDataAsync(this IServiceProvider serviceProvider)
     {
         using (var scope = serviceProvider.CreateScope())
@@ -25,7 +77,7 @@ public static class SeedDataExtensions
                 await context.Database.MigrateAsync();
 
                 // Seed roles
-                var roles = new[] { "Admin", "UnitAdmin", "User" };
+                var roles = new[] { "Admin", "Manager", "User" };
                 foreach (var role in roles)
                 {
                     if (!await roleManager.RoleExistsAsync(role))
@@ -34,6 +86,9 @@ public static class SeedDataExtensions
                         logger.LogInformation($"Created role: {role}");
                     }
                 }
+
+                // Seed role permissions
+                await SeedRolePermissionsAsync(context, logger);
 
                 // Seed admin user
                 var adminEmail = "admin@ipmanagement.com";

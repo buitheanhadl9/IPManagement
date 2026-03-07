@@ -1,13 +1,15 @@
+using IPManagement.API;
 using IPManagement.API.Data;
 using IPManagement.API.Models;
 using IPManagement.API.Services;
 using IPManagement.API.Extensions;
+using IPManagement.API.Authorization;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using System.Text;
-using IPManagement.API.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -55,7 +57,26 @@ builder.Services.AddAuthentication(options =>
     };
 });
 
-builder.Services.AddAuthorization();
+builder.Services.AddAuthorizationBuilder()
+    .AddPolicy(Permissions.IpCreate, policy => policy.Requirements.Add(new PermissionRequirement(Permissions.IpCreate)))
+    .AddPolicy(Permissions.IpRead, policy => policy.Requirements.Add(new PermissionRequirement(Permissions.IpRead)))
+    .AddPolicy(Permissions.IpUpdate, policy => policy.Requirements.Add(new PermissionRequirement(Permissions.IpUpdate)))
+    .AddPolicy(Permissions.IpDelete, policy => policy.Requirements.Add(new PermissionRequirement(Permissions.IpDelete)))
+    .AddPolicy(Permissions.UnitCreate, policy => policy.Requirements.Add(new PermissionRequirement(Permissions.UnitCreate)))
+    .AddPolicy(Permissions.UnitRead, policy => policy.Requirements.Add(new PermissionRequirement(Permissions.UnitRead)))
+    .AddPolicy(Permissions.UnitUpdate, policy => policy.Requirements.Add(new PermissionRequirement(Permissions.UnitUpdate)))
+    .AddPolicy(Permissions.UnitDelete, policy => policy.Requirements.Add(new PermissionRequirement(Permissions.UnitDelete)))
+    .AddPolicy(Permissions.UserCreate, policy => policy.Requirements.Add(new PermissionRequirement(Permissions.UserCreate)))
+    .AddPolicy(Permissions.UserRead, policy => policy.Requirements.Add(new PermissionRequirement(Permissions.UserRead)))
+    .AddPolicy(Permissions.UserUpdate, policy => policy.Requirements.Add(new PermissionRequirement(Permissions.UserUpdate)))
+    .AddPolicy(Permissions.UserDelete, policy => policy.Requirements.Add(new PermissionRequirement(Permissions.UserDelete)))
+    .AddPolicy(Permissions.RoleCreate, policy => policy.Requirements.Add(new PermissionRequirement(Permissions.RoleCreate)))
+    .AddPolicy(Permissions.RoleRead, policy => policy.Requirements.Add(new PermissionRequirement(Permissions.RoleRead)))
+    .AddPolicy(Permissions.RoleUpdate, policy => policy.Requirements.Add(new PermissionRequirement(Permissions.RoleUpdate)))
+    .AddPolicy(Permissions.RoleDelete, policy => policy.Requirements.Add(new PermissionRequirement(Permissions.RoleDelete)));
+
+// Register PermissionHandler as Scoped to avoid singleton-scoped service dependency issues
+builder.Services.AddScoped<IAuthorizationHandler, PermissionHandler>();
 
 // Configure Swagger
 builder.Services.AddEndpointsApiExplorer();

@@ -45,17 +45,30 @@ namespace IPManagement.API.Services
             foreach (var role in roles)
             {
                 var userCount = await _userManager.GetUsersInRoleAsync(role.Name);
+                
+                // Description mặc định cho các role built-in
+                var defaultDescription = role.Name switch
+                {
+                    "Admin" => "Có toàn quyền quản lý hệ thống",
+                    "Manager" => "Quản lý IP addresses của đơn vị",
+                    "User" => "Chỉ có quyền xem",
+                    _ => null
+                };
+                
+                // Lấy description từ claim nếu có, ngược lại dùng default
+                var description = defaultDescription;
+                var roleClaims = await _roleManager.GetClaimsAsync(role);
+                var descriptionClaim = roleClaims.FirstOrDefault(c => c.Type == "description");
+                if (descriptionClaim != null)
+                {
+                    description = descriptionClaim.Value;
+                }
+                
                 roleDtos.Add(new RoleDto
                 {
                     Id = role.Id,
                     Name = role.Name ?? string.Empty,
-                    Description = role.Name switch
-                    {
-                        "Admin" => "Có toàn quyền quản lý hệ thống",
-                        "UnitAdmin" => "Quản lý IP addresses của đơn vị",
-                        "User" => "Chỉ có quyền xem",
-                        _ => null
-                    },
+                    Description = description,
                     UserCount = userCount.Count
                 });
             }
@@ -70,17 +83,29 @@ namespace IPManagement.API.Services
                 return null;
 
             var userCount = await _userManager.GetUsersInRoleAsync(role.Name);
+            
+            // Lấy description từ claim nếu có, ngược lại dùng default
+            var defaultDescription = role.Name switch
+            {
+                "Admin" => "Có toàn quyền quản lý hệ thống",
+                "UnitAdmin" => "Quản lý IP addresses của đơn vị",
+                "User" => "Chỉ có quyền xem",
+                _ => null
+            };
+            
+            var description = defaultDescription;
+            var roleClaims = await _roleManager.GetClaimsAsync(role);
+            var descriptionClaim = roleClaims.FirstOrDefault(c => c.Type == "description");
+            if (descriptionClaim != null)
+            {
+                description = descriptionClaim.Value;
+            }
+            
             return new RoleDto
             {
                 Id = role.Id,
                 Name = role.Name ?? string.Empty,
-                Description = role.Name switch
-                {
-                    "Admin" => "Có toàn quyền quản lý hệ thống",
-                    "UnitAdmin" => "Quản lý IP addresses của đơn vị",
-                    "User" => "Chỉ có quyền xem",
-                    _ => null
-                },
+                Description = description,
                 UserCount = userCount.Count
             };
         }
@@ -95,6 +120,12 @@ namespace IPManagement.API.Services
 
             if (!result.Succeeded)
                 return null;
+
+            // Lưu description vào role claim
+            if (!string.IsNullOrEmpty(request.Description))
+            {
+                await _roleManager.AddClaimAsync(role, new System.Security.Claims.Claim("description", request.Description));
+            }
 
             return new RoleDto
             {
@@ -111,10 +142,20 @@ namespace IPManagement.API.Services
             if (role == null)
                 return false;
 
-            // Lưu ý: ASP.NET Identity không hỗ trợ đổi tên role trực tiếp
-            // Chúng ta chỉ có thể cập nhật mô tả (nếu có trường description)
-            // Ở đây, chúng ta không có trường description trong IdentityRole
-            // Nên chỉ cho phép update nếu cần mở rộng model
+            // Cập nhật description trong role claim
+            var existingClaims = await _roleManager.GetClaimsAsync(role);
+            var descriptionClaim = existingClaims.FirstOrDefault(c => c.Type == "description");
+            
+            if (descriptionClaim != null)
+            {
+                // Xóa claim cũ và thêm claim mới
+                await _roleManager.RemoveClaimAsync(role, descriptionClaim);
+            }
+            
+            if (!string.IsNullOrEmpty(request.Description))
+            {
+                await _roleManager.AddClaimAsync(role, new System.Security.Claims.Claim("description", request.Description));
+            }
 
             return true;
         }
@@ -126,7 +167,7 @@ namespace IPManagement.API.Services
                 return false;
 
             // Không cho phép xóa các role mặc định
-            if (role.Name is "Admin" or "UnitAdmin" or "User")
+            if (role.Name is "Admin" or "Manager" or "User")
                 return false;
 
             var result = await _roleManager.DeleteAsync(role);

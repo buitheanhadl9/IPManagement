@@ -1,6 +1,12 @@
 import api from './api';
 import type { Unit, UnitTree, UnitCreateRequest, UnitUpdateRequest } from '../types/unit';
 
+export interface UnitSelection {
+  id: number;
+  name: string;
+  code?: string;
+}
+
 export const unitService = {
   getAllUnits: async (): Promise<Unit[]> => {
     const response = await api.get<Unit[]>('/units');
@@ -19,6 +25,11 @@ export const unitService = {
 
   getMyUnit: async (): Promise<Unit> => {
     const response = await api.get<Unit>('/units/my-unit');
+    return response.data;
+  },
+
+  getAllUnitsForSelection: async (): Promise<UnitSelection[]> => {
+    const response = await api.get<UnitSelection[]>('/units/selection');
     return response.data;
   },
 

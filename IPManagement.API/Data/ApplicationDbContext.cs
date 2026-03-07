@@ -19,6 +19,7 @@ namespace IPManagement.API.Data
         public DbSet<IPAddressRecord> IPAddresses { get; set; }
         public DbSet<AuditLog> AuditLogs { get; set; }
         public DbSet<UserUnitAssignment> UserUnitAssignments { get; set; }
+        public DbSet<RolePermission> RolePermissions { get; set; }
 
         protected override void OnModelCreating(ModelBuilder builder)
         {

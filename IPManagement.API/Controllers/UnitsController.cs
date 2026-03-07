@@ -62,6 +62,14 @@ namespace IPManagement.API.Controllers
             }
         }
 
+        [HttpGet("selection")]
+        [AllowAnonymous]
+        public async Task<ActionResult<UnitSelectionDto[]>> GetAllUnitsForSelection()
+        {
+            var result = await _unitService.GetAllUnitsForSelectionAsync();
+            return Ok(result);
+        }
+
         [HttpPost]
         public async Task<ActionResult<UnitDto>> CreateUnit([FromBody] UnitCreateRequest request)
         {

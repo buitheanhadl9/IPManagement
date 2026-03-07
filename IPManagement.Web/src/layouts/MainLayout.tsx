@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Layout, Menu, Button, Drawer, Space, Avatar, Dropdown } from 'antd';
+import { Layout, Menu, Button, Drawer, Avatar, Dropdown } from 'antd';
 import type { MenuProps } from 'antd';
 import {
   HomeOutlined,

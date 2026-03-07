@@ -30,6 +30,7 @@ namespace IPManagement.API.DTOs
         public UserUnitDto[] Units { get; set; } = Array.Empty<UserUnitDto>();
         public string? UnitName { get; set; }
         public string[] Roles { get; set; } = Array.Empty<string>();
+        public string[] Permissions { get; set; } = Array.Empty<string>();
     }
 
     public class RegisterRequest

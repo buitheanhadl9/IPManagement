@@ -30,11 +30,9 @@ const IPListPage = () => {
   // Check permissions
   console.log('=== IPListPage User Info ===');
   console.log('User:', user);
-  console.log('User roles:', user?.roles);
-  const canCreateIP = hasPermission(user?.roles, Permissions.IP_CREATE);
-  const canUpdateIP = hasPermission(user?.roles, Permissions.IP_UPDATE);
-  const canDeleteIP = hasPermission(user?.roles, Permissions.IP_DELETE);
-  console.log('canCreateIP:', canCreateIP, 'canUpdateIP:', canUpdateIP, 'canDeleteIP:', canDeleteIP);
+  const canCreateIP = hasPermission(user, Permissions.IP_CREATE);
+  const canUpdateIP = hasPermission(user, Permissions.IP_UPDATE);
+  const canDeleteIP = hasPermission(user, Permissions.IP_DELETE);
 
   useEffect(() => {
     fetchIPAddresses();

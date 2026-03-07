@@ -37,14 +37,33 @@ namespace IPManagement.API.Services
                 return new UserListResponse { Items = Array.Empty<UserListDto>() };
 
             var isAdmin = await IsAdminAsync(user);
+            var userRoles = await _userManager.GetRolesAsync(user);
+            var isRegularUser = userRoles.Contains("User") && !isAdmin;
             
             var query = _context.Users
                 .Include(u => u.UserUnitAssignments)
                     .ThenInclude(ua => ua.Unit)
                 .AsQueryable();
 
-            // Nếu không phải admin, chỉ xem được user cùng primary unit
-            if (!isAdmin)
+            // Nếu là User (chỉ xem), xem được data của các unit được gán
+            if (isRegularUser)
+            {
+                var userUnits = await _context.UserUnitAssignments
+                    .Where(ua => ua.UserId == user.Id)
+                    .Select(ua => ua.UnitId)
+                    .ToListAsync();
+                
+                if (userUnits.Count == 0)
+                {
+                    return new UserListResponse { Items = Array.Empty<UserListDto>() };
+                }
+                
+                // Chỉ xem được user trong cùng các unit được gán
+                query = query.Where(u => _context.UserUnitAssignments
+                    .Any(ua => ua.UserId == u.Id && userUnits.Contains(ua.UnitId)));
+            }
+            // Nếu không phải admin và không phải User (ví dụ UnitAdmin), chỉ xem được user cùng primary unit
+            else if (!isAdmin)
             {
                 var primaryAssignment = await _context.UserUnitAssignments
                     .FirstOrDefaultAsync(ua => ua.UserId == user.Id && ua.IsPrimary);

@@ -15,6 +15,7 @@ export interface User {
   unitName?: string;
   units?: UserUnit[];
   roles: string[];
+  permissions?: string[];
 }
 
 export interface LoginRequest {

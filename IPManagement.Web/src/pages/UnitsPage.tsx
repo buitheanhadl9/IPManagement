@@ -5,7 +5,7 @@ import type { Unit, UnitCreateRequest, UnitUpdateRequest } from '../types/unit';
 import { unitService } from '../services/unit.service';
 import { useNavigate } from 'react-router-dom';
 import { useAppSelector } from '../hooks/useAppSelector';
-import { hasPermission, Permissions, isAdmin } from '../utils/permissions';
+import { isAdmin } from '../utils/permissions';
 
 const { Title } = Typography;
 const { Search } = Input;
@@ -22,9 +22,9 @@ const UnitsPage = () => {
   const navigate = useNavigate();
 
   // Check permissions - only Admin can create, update, delete units
-  const canCreateUnit = isAdmin(user?.roles);
-  const canUpdateUnit = isAdmin(user?.roles);
-  const canDeleteUnit = isAdmin(user?.roles);
+  const canCreateUnit = isAdmin(user);
+  const canUpdateUnit = isAdmin(user);
+  const canDeleteUnit = isAdmin(user);
 
   useEffect(() => {
     fetchUnits();
@@ -147,6 +147,12 @@ const UnitsPage = () => {
       dataIndex: 'parentUnitName',
       key: 'parentUnitName',
       render: (parentName: string | undefined) => parentName || '-',
+    },
+    {
+      title: 'Mô tả',
+      dataIndex: 'description',
+      key: 'description',
+      render: (description: string | undefined) => description || '-',
     },
     {
       title: 'Số IP',

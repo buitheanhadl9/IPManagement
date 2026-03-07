@@ -2,8 +2,14 @@ using IPManagement.API.DTOs;
 using IPManagement.API.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Security.Claims;
 using System.Threading.Tasks;
+using IPManagement.API.Data;
+using IPManagement.API.Models;
 
 namespace IPManagement.API.Controllers
 {
@@ -13,10 +19,12 @@ namespace IPManagement.API.Controllers
     public class RolesController : ControllerBase
     {
         private readonly IRoleService _roleService;
+        private readonly ApplicationDbContext _context;
 
-        public RolesController(IRoleService roleService)
+        public RolesController(IRoleService roleService, ApplicationDbContext context)
         {
             _roleService = roleService;
+            _context = context;
         }
 
         [HttpGet]
@@ -96,6 +104,73 @@ namespace IPManagement.API.Controllers
                 return BadRequest(new { message = "Failed to remove role" });
 
             return Ok(new { message = "Role removed successfully" });
+        }
+
+        /// <summary>
+        /// Get permissions for a specific role
+        /// </summary>
+        [HttpGet("{roleId}/permissions")]
+        [Authorize(Roles = "Admin")]
+        public async Task<ActionResult<IEnumerable<string>>> GetRolePermissions(string roleId)
+        {
+            var role = await _context.Roles.FindAsync(roleId);
+            if (role == null)
+                return NotFound();
+
+            var permissions = await _context.RolePermissions
+                .Where(rp => rp.RoleName == role.Name)
+                .Select(rp => rp.Permission)
+                .ToListAsync();
+
+            return Ok(permissions);
+        }
+
+        /// <summary>
+        /// Update permissions for a specific role
+        /// </summary>
+        [HttpPut("{roleId}/permissions")]
+        [Authorize(Roles = "Admin")]
+        public async Task<ActionResult> UpdateRolePermissions(string roleId, [FromBody] IEnumerable<string> permissions)
+        {
+            var role = await _context.Roles.FindAsync(roleId);
+            if (role == null)
+                return NotFound();
+
+            // Remove existing permissions
+            var existingPermissions = await _context.RolePermissions
+                .Where(rp => rp.RoleName == role.Name)
+                .ToListAsync();
+            _context.RolePermissions.RemoveRange(existingPermissions);
+
+            // Add new permissions
+            foreach (var permission in permissions)
+            {
+                _context.RolePermissions.Add(new RolePermission
+                {
+                    RoleName = role.Name,
+                    Permission = permission
+                });
+            }
+
+            await _context.SaveChangesAsync();
+            return Ok(new { message = "Permissions updated successfully" });
+        }
+
+        /// <summary>
+        /// Get all available permissions
+        /// </summary>
+        [HttpGet("permissions/all")]
+        [Authorize(Policy = Permissions.RoleRead)]
+        public ActionResult<IEnumerable<string>> GetAllAvailablePermissions()
+        {
+            var allPermissions = new[]
+            {
+                Permissions.IpCreate, Permissions.IpRead, Permissions.IpUpdate, Permissions.IpDelete,
+                Permissions.UnitCreate, Permissions.UnitRead, Permissions.UnitUpdate, Permissions.UnitDelete,
+                Permissions.UserCreate, Permissions.UserRead, Permissions.UserUpdate, Permissions.UserDelete,
+                Permissions.RoleCreate, Permissions.RoleRead, Permissions.RoleUpdate, Permissions.RoleDelete
+            };
+            return Ok(allPermissions);
         }
     }
 }

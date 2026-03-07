@@ -1,3 +1,5 @@
+import type { User } from '../types/auth';
+
 // Permission constants
 export const Permissions = {
   // IP Address permissions
@@ -17,98 +19,132 @@ export const Permissions = {
   USER_READ: 'user:read',
   USER_UPDATE: 'user:update',
   USER_DELETE: 'user:delete',
+  
+  // Role permissions
+  ROLE_CREATE: 'role:create',
+  ROLE_READ: 'role:read',
+  ROLE_UPDATE: 'role:update',
+  ROLE_DELETE: 'role:delete',
+  
+  // Audit log permissions
+  AUDIT_READ: 'audit:read',
 };
 
 // Role constants
 export const Roles = {
   ADMIN: 'Admin',
-  UNIT_ADMIN: 'UnitAdmin',
+  MANAGER: 'Manager',
   USER: 'User',
 };
 
-// Permission mapping by role
-export const RolePermissions: Record<string, string[]> = {
-  [Roles.ADMIN]: [
-    // IP permissions
-    Permissions.IP_CREATE,
+// Level mapping (từ thấp đến cao)
+export const ROLE_LEVELS: Record<string, number> = {
+  [Roles.USER]: 1,
+  [Roles.MANAGER]: 2,
+  [Roles.ADMIN]: 3,
+};
+
+// Permissions theo level
+const LEVEL_PERMISSIONS: Record<number, string[]> = {
+  1: [
     Permissions.IP_READ,
+    Permissions.UNIT_READ,
+    Permissions.USER_READ,
+  ],
+  2: [
+    Permissions.IP_READ,
+    Permissions.IP_CREATE,
     Permissions.IP_UPDATE,
     Permissions.IP_DELETE,
-    // Unit permissions
-    Permissions.UNIT_CREATE,
     Permissions.UNIT_READ,
+    Permissions.USER_READ,
+  ],
+  3: [
+    Permissions.IP_READ,
+    Permissions.IP_CREATE,
+    Permissions.IP_UPDATE,
+    Permissions.IP_DELETE,
+    Permissions.UNIT_READ,
+    Permissions.UNIT_CREATE,
     Permissions.UNIT_UPDATE,
     Permissions.UNIT_DELETE,
-    // User permissions
-    Permissions.USER_CREATE,
     Permissions.USER_READ,
+    Permissions.USER_CREATE,
     Permissions.USER_UPDATE,
     Permissions.USER_DELETE,
   ],
-  [Roles.UNIT_ADMIN]: [
-    // IP permissions
-    Permissions.IP_CREATE,
-    Permissions.IP_READ,
-    Permissions.IP_UPDATE,
-    Permissions.IP_DELETE,
-    // Unit permissions (read only)
-    Permissions.UNIT_READ,
-    // User permissions (read only)
-    Permissions.USER_READ,
-  ],
-  [Roles.USER]: [
-    // IP permissions (read only)
-    Permissions.IP_READ,
-    // Unit permissions (read only)
-    Permissions.UNIT_READ,
-    // User permissions (read only)
-    Permissions.USER_READ,
-  ],
 };
 
-// Helper function to check if a user has a specific permission
-export const hasPermission = (userRoles: string[] | undefined, permission: string): boolean => {
-  if (!userRoles || userRoles.length === 0) {
-    return false;
+/**
+ * Tính level quyền của user dựa trên System Roles (user.roles)
+ * Unit Assignments chỉ dùng để xác định user được làm việc với unit nào
+ * Quyền sẽ dựa hoàn toàn vào System Roles
+ */
+export const getUserPermissionLevel = (user: User | undefined | null): number => {
+  if (!user || !user.roles || user.roles.length === 0) {
+    return 1; // Mặc định là User nếu không có role
   }
   
-  // Nếu user chỉ có role "User" thì không có quyền create/update/delete
-  const hasOnlyUserRole = userRoles.length === 1 && userRoles[0] === Roles.USER;
-  if (hasOnlyUserRole) {
-    // User chỉ có quyền read
-    return permission === Permissions.IP_READ || permission === Permissions.UNIT_READ || permission === Permissions.USER_READ;
+  // Kiểm tra theo thứ tự ưu tiên (Admin > UnitAdmin > User)
+  if (user.roles.includes(Roles.ADMIN)) {
+    return 3;
+  }
+  if (user.roles.includes(Roles.MANAGER)) {
+    return 2;
   }
   
-  for (const role of userRoles) {
-    const rolePerms = RolePermissions[role];
-    if (rolePerms && rolePerms.includes(permission)) {
-      return true;
-    }
+  return 1; // Mặc định là User
+};
+
+/**
+ * Kiểm tra quyền của user
+ * Level cao nhất trong bất kỳ unit nào sẽ áp dụng cho toàn hệ thống
+ */
+export const hasPermission = (user: User | undefined | null, permission: string): boolean => {
+  if (!user) return false;
+  
+  // Ưu tiên sử dụng permissions từ backend (nếu có)
+  if (user.permissions && user.permissions.length > 0) {
+    return user.permissions.includes(permission);
   }
   
-  return false;
+  // Fallback: sử dụng logic level cũ (cho trường hợp chưa có permissions từ backend)
+  const userLevel = getUserPermissionLevel(user);
+  const allowedPermissions = LEVEL_PERMISSIONS[userLevel] || [];
+  return allowedPermissions.includes(permission);
 };
 
-// Helper function to check if a user has any of the specified roles
-export const hasRole = (userRoles: string[] | undefined, roles: string[]): boolean => {
-  if (!userRoles || userRoles.length === 0) {
-    return false;
+/**
+ * Kiểm tra nếu user có quyền Admin (level >= 3)
+ */
+export const isAdmin = (user: User | undefined | null): boolean => {
+  return getUserPermissionLevel(user) >= 3;
+};
+
+/**
+ * Kiểm tra nếu user có quyền UnitAdmin hoặc cao hơn (level >= 2)
+ */
+export const isUnitAdmin = (user: User | undefined): boolean => {
+  return getUserPermissionLevel(user) >= 2;
+};
+
+/**
+ * Kiểm tra nếu user chỉ có quyền User (level === 1)
+ */
+export const isRegularUser = (user: User | undefined): boolean => {
+  return getUserPermissionLevel(user) === 1;
+};
+
+/**
+ * Lấy danh sách permissions của user
+ */
+export const getUserPermissions = (user: User | undefined): string[] => {
+  // Ưu tiên sử dụng permissions từ backend (nếu có)
+  if (user?.permissions && user.permissions.length > 0) {
+    return user.permissions;
   }
   
-  return userRoles.some(role => roles.includes(role));
-};
-
-// Helper function to check if a user is Admin
-export const isAdmin = (userRoles: string[] | undefined): boolean => {
-  return hasRole(userRoles, [Roles.ADMIN]);
-};
-
-// Helper function to check if a user is UnitAdmin
-export const isUnitAdmin = (userRoles: string[] | undefined): boolean => {
-  return hasRole(userRoles, [Roles.UNIT_ADMIN]);
-};
-
-// Helper function to check if a user is regular User
-export const isRegularUser = (userRoles: string[] | undefined): boolean => {
-  return hasRole(userRoles, [Roles.USER]);
+  // Fallback: sử dụng logic level cũ
+  const userLevel = getUserPermissionLevel(user);
+  return LEVEL_PERMISSIONS[userLevel] || [];
 };

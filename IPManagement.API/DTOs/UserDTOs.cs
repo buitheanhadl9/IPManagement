@@ -66,6 +66,7 @@ namespace IPManagement.API.DTOs
         public string? Phone { get; set; }
         public UserUnitDto[] Units { get; set; } = Array.Empty<UserUnitDto>();
         public string[] Roles { get; set; } = Array.Empty<string>();
+        public string[] Permissions { get; set; } = Array.Empty<string>();
         public bool IsActive { get; set; }
         public DateTime CreatedAt { get; set; }
         public DateTime? UpdatedAt { get; set; }
@@ -81,6 +82,7 @@ namespace IPManagement.API.DTOs
         public string? UnitName { get; set; }
         public UserUnitDto[] Units { get; set; } = Array.Empty<UserUnitDto>();
         public string[] Roles { get; set; } = Array.Empty<string>();
+        public string[] Permissions { get; set; } = Array.Empty<string>();
         public bool IsActive { get; set; }
         public DateTime? LastLogin { get; set; }
     }
