@@ -105,6 +105,7 @@ namespace IPManagement.API.Services
 
             var totalCount = await query.CountAsync();
             var ipList = await query
+                .Include(ip => ip.Unit)
                 .OrderByDescending(ip => ip.CreatedAt)
                 .Skip((pageNumber - 1) * pageSize)
                 .Take(pageSize)

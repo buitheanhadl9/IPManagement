@@ -162,7 +162,7 @@ const IPManagementPage = () => {
     },
     {
       title: 'Unit',
-      dataIndex: ['unit', 'name'],
+      dataIndex: 'unitName',
       key: 'unitName',
       width: 150,
       render: (unitName: string | undefined) => unitName || '-',

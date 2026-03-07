@@ -67,12 +67,6 @@ namespace IPManagement.API.Services
 
             var units = await query.OrderBy(u => u.Name).ToListAsync();
             
-            // Get all units for counting IPs including child units (with IP addresses loaded)
-            var allUnits = await _context.Units
-                .Include(u => u.ChildUnits)
-                .Include(u => u.IPAddresses)
-                .ToListAsync();
-            
             return units.Select(u => new UnitDto
             {
                 Id = u.Id,
@@ -87,7 +81,7 @@ namespace IPManagement.API.Services
                 CreatedAt = u.CreatedAt,
                 UpdatedAt = u.UpdatedAt,
                 IsActive = u.IsActive,
-                IPAddressCount = CountIPsIncludingChildren(u.Id, allUnits)
+                IPAddressCount = CountIPsForUnit(u.Id)
             }).ToArray();
         }
 
@@ -444,6 +438,39 @@ namespace IPManagement.API.Services
             }
             
             return count;
+        }
+
+        private int CountIPsForUnit(long unitId)
+        {
+            // Get all unit IDs including children recursively
+            var allChildUnitIds = GetAllChildUnitIds(unitId);
+            
+            // Count IPs for this unit and all child units
+            var totalIpCount = _context.IPAddresses
+                .Where(ip => ip.UnitId == unitId || allChildUnitIds.Contains(ip.UnitId))
+                .Count();
+            
+            return totalIpCount;
+        }
+
+        private HashSet<long> GetAllChildUnitIds(long unitId)
+        {
+            var childIds = new HashSet<long>();
+            var queue = new Queue<long>();
+            queue.Enqueue(unitId);
+            
+            while (queue.Count > 0)
+            {
+                var currentId = queue.Dequeue();
+                var children = _context.Units.Where(u => u.ParentUnitId == currentId).Select(u => u.Id);
+                foreach (var childId in children)
+                {
+                    childIds.Add(childId);
+                    queue.Enqueue(childId);
+                }
+            }
+            
+            return childIds;
         }
 
         private UnitTreeDto BuildUnitTree(Unit unit)

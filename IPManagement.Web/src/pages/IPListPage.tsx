@@ -163,6 +163,17 @@ const IPListPage = () => {
       render: (port: string | undefined) => port || '-',
     },
     {
+      title: 'Unit',
+      dataIndex: 'unitName',
+      key: 'unitName',
+      render: (unitName: string | undefined, record: IPAddress) => {
+        console.log('=== Unit Column Debug ===');
+        console.log('unitName:', unitName);
+        console.log('record:', record);
+        return unitName || '-';
+      },
+    },
+    {
       title: 'Status',
       dataIndex: 'status',
       key: 'status',

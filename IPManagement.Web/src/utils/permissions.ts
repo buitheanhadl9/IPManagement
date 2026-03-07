@@ -148,3 +148,11 @@ export const getUserPermissions = (user: User | undefined): string[] => {
   const userLevel = getUserPermissionLevel(user);
   return LEVEL_PERMISSIONS[userLevel] || [];
 };
+
+/**
+ * Kiểm tra nếu user được gán cho unit cụ thể
+ */
+export const isAssignedToUnit = (user: User | undefined | null, unitId: number): boolean => {
+  if (!user || !user.units || user.units.length === 0) return false;
+  return user.units.some(u => u.id === unitId);
+};

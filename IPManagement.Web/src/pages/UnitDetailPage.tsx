@@ -7,7 +7,7 @@ import { ipService } from '../services/ip.service';
 import { unitService } from '../services/unit.service';
 import type { Unit } from '../types/unit';
 import { useAppSelector } from '../hooks/useAppSelector';
-import { hasPermission, Permissions } from '../utils/permissions';
+import { hasPermission, Permissions, isAssignedToUnit, isAdmin } from '../utils/permissions';
 
 const { Title } = Typography;
 
@@ -30,12 +30,21 @@ const UnitDetailPage = () => {
   const canUpdateIP = hasPermission(user, Permissions.IP_UPDATE);
   const canDeleteIP = hasPermission(user, Permissions.IP_DELETE);
 
+  // Kiểm tra quyền truy cập unit
+  const hasUnitAccess = id ? isAssignedToUnit(user, parseInt(id)) : false;
+  
   useEffect(() => {
     if (id) {
+      // Kiểm tra quyền truy cập trước khi fetch dữ liệu
+      if (!hasUnitAccess && !isAdmin(user)) {
+        message.error('Bạn không có quyền truy cập đơn vị này');
+        navigate('/units');
+        return;
+      }
       fetchUnit();
       fetchIPAddresses();
     }
-  }, [id]);
+  }, [id, hasUnitAccess]);
 
   const fetchUnit = async () => {
     if (!id) return;
@@ -228,6 +237,32 @@ const UnitDetailPage = () => {
       ),
     },
   ];
+
+  // Nếu không có quyền truy cập, hiển thị thông báo lỗi
+  if (!hasUnitAccess && !isAdmin(user)) {
+    return (
+      <div>
+        <Breadcrumb
+          items={[
+            { title: 'Quản lý đơn vị', href: '/units' },
+            { title: 'Lỗi quyền truy cập' },
+          ]}
+          style={{ marginBottom: 16 }}
+          separator=">"
+        />
+        <Card>
+          <Title level={4} style={{ color: '#ff4d4f' }}>
+            <span role="img" aria-label="error" style={{ marginRight: 8 }}>⚠️</span>
+            Không có quyền truy cập
+          </Title>
+          <p>Bạn không có quyền truy cập đơn vị này. Vui lòng liên hệ quản trị viên để được cấp quyền.</p>
+          <Button type="primary" onClick={() => navigate('/units')}>
+            Quay lại danh sách đơn vị
+          </Button>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div>

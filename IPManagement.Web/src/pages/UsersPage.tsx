@@ -201,6 +201,7 @@ const UsersPage = () => {
       message.error('Bạn không có quyền chỉnh sửa user.');
       return;
     }
+    setAssignAllUnits(false); // Bỏ tích checkbox khi thêm unit thủ công
     setUnitAssignments([...unitAssignments, { unitId: 0, isPrimary: false }]);
   };
 
@@ -209,6 +210,7 @@ const UsersPage = () => {
       message.error('Bạn không có quyền chỉnh sửa user.');
       return;
     }
+    setAssignAllUnits(false); // Bỏ tích checkbox khi xóa unit
     const updated = unitAssignments.filter((_, i) => i !== index);
     setUnitAssignments(updated);
   };
@@ -218,6 +220,7 @@ const UsersPage = () => {
       message.error('Bạn không có quyền chỉnh sửa user.');
       return;
     }
+    setAssignAllUnits(false); // Bỏ tích checkbox khi sửa unit
     let updated = [...unitAssignments];
     updated[index] = { ...updated[index], [field]: value };
     
@@ -239,9 +242,9 @@ const UsersPage = () => {
       return;
     }
     try {
-      // Nếu checkbox "Assign All Units" được tích, gán tất cả units
+      // Nếu checkbox "Assign All Units" được tích và đang tạo mới, gán tất cả units
       let assignmentsToUse = unitAssignments;
-      if (assignAllUnits && units.length > 0) {
+      if (assignAllUnits && !editingId && units.length > 0) {
         assignmentsToUse = units.map(u => ({
           unitId: u.id,
           isPrimary: false

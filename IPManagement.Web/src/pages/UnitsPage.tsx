@@ -92,8 +92,9 @@ const UnitsPage = () => {
       await unitService.deleteUnit(id);
       message.success('Unit deleted successfully');
       fetchUnits();
-    } catch {
-      message.error('Failed to delete unit');
+    } catch (error: any) {
+      const errorMessage = error?.response?.data?.message || error?.message || 'Failed to delete unit';
+      message.error('Failed to delete unit: ' + errorMessage);
     }
   };
 
