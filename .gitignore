@@ -1,0 +1,60 @@
+# Build outputs
+bin/
+obj/
+Debug/
+Release/
+x64/
+x86/
+x86_64/
+
+# Visual Studio
+.vs/
+.vscode/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Environment files
+appsettings.Development.json
+*.pfx
+*.key
+
+# User secrets
+secretstore.json
+
+# Test results
+TestResults/
+*.trx
+
+# Coverage
+*.coverage
+*.coveragexml
+
+# NuGet
+*.nupkg
+*.snupkg
+
+# Logs
+*.log
+*.txt
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp
+
+# Database
+*.mdf
+*.ldf
+*.sdf
+
+# Publish folders
+Publish/
+publish/
+
+# Entity Framework Migrations
+IPManagement.API/Migrations/
