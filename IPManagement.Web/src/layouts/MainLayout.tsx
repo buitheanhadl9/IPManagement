@@ -31,27 +31,36 @@ const MainLayout = ({ children }: { children: React.ReactNode }) => {
     navigate('/login');
   };
 
-  const menuItems = [
+  const menuItems: MenuProps['items'] = [
     {
       key: '/',
       icon: <HomeOutlined />,
       label: 'Dashboard',
       style: { color: '#fff' },
     },
-    {
-      key: '/units',
-      icon: <BuildOutlined />,
-      label: 'Quản lý đơn vị',
-    },
-    {
-      key: '/ip-management',
-      icon: <CloudServerOutlined />,
-      label: 'Quản lý IP',
-    },
-    ];
+  ];
 
   // Show menu items based on permissions (chỉ khi user đã load)
   if (user) {
+    // Quản lý đơn vị - cần UNIT_READ
+    if (hasPermission(user, Permissions.UNIT_READ)) {
+      menuItems.push({
+        key: '/units',
+        icon: <BuildOutlined />,
+        label: 'Quản lý đơn vị',
+      });
+    }
+    
+    // Quản lý IP - cần IP_READ
+    if (hasPermission(user, Permissions.IP_READ)) {
+      menuItems.push({
+        key: '/ip-management',
+        icon: <CloudServerOutlined />,
+        label: 'Quản lý IP',
+      });
+    }
+    
+    // Users - cần USER_READ
     if (hasPermission(user, Permissions.USER_READ)) {
       menuItems.push({
         key: '/users',
@@ -59,6 +68,8 @@ const MainLayout = ({ children }: { children: React.ReactNode }) => {
         label: 'Users',
       });
     }
+    
+    // Roles - cần ROLE_READ
     if (hasPermission(user, Permissions.ROLE_READ)) {
       menuItems.push({
         key: '/roles',
@@ -68,7 +79,12 @@ const MainLayout = ({ children }: { children: React.ReactNode }) => {
     }
   }
 
-  const currentKey = menuItems.find(item => location.pathname.startsWith(item.key))?.key || '/';
+  const currentKey = (() => {
+    const foundItem = menuItems.find((item): item is NonNullable<typeof item> =>
+      item !== null && item !== undefined && typeof item.key === 'string' && location.pathname.startsWith(item.key)
+    );
+    return foundItem?.key || '/';
+  })();
 
   const userMenuItems: MenuProps['items'] = [
     {
@@ -120,7 +136,7 @@ const MainLayout = ({ children }: { children: React.ReactNode }) => {
         items={menuItems}
         className="sidebar-menu"
         onClick={({ key }) => {
-          navigate(key);
+          navigate(key as string);
           setMobileMenuOpen(false);
         }}
       />
