@@ -6,10 +6,6 @@ namespace IPManagement.API.Models
 {
     public class ApplicationUser : IdentityUser
     {
-        public long? UnitId { get; set; }
-        
-        public Unit? Unit { get; set; }
-        
         public string? FullName { get; set; }
         
         public string? Phone { get; set; }
@@ -21,6 +17,12 @@ namespace IPManagement.API.Models
         public DateTime? UpdatedAt { get; set; }
         
         public DateTime? LastLogin { get; set; }
+        
+        public DateTime? LastActivity { get; set; }
+        
+        public string? RefreshToken { get; set; }
+        
+        public DateTime? RefreshTokenExpiry { get; set; }
         
         public ICollection<IPAddressRecord> CreatedIPAddresses { get; set; } = new List<IPAddressRecord>();
         

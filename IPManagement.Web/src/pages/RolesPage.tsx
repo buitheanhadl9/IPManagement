@@ -5,7 +5,7 @@ import { roleService } from '../services/role.service';
 import { permissionService } from '../services/permission.service';
 import type { Role, CreateRoleRequest } from '../types/role';
 import { useAppSelector } from '../hooks/useAppSelector';
-import { isAdmin, Permissions } from '../utils/permissions';
+import { hasPermission, Permissions } from '../utils/permissions';
 
 const { Title } = Typography;
 
@@ -69,14 +69,20 @@ const RolesPage = () => {
   const [permissionsLoading, setPermissionsLoading] = useState(false);
 
   // Chỉ Admin mới được vào trang này
-  if (!isAdmin(user)) {
+  if (!hasPermission(user, Permissions.ROLE_READ)) {
     return (
       <div>
         <Title level={2}>Không có quyền truy cập</Title>
-        <p>Chỉ Admin mới được truy cập trang quản lý role.</p>
+        <p>Bạn không có quyền truy cập trang quản lý role.</p>
       </div>
     );
   }
+
+  // Check permissions based on user permissions
+  const canCreateRole = hasPermission(user, Permissions.ROLE_CREATE);
+  const canUpdateRole = hasPermission(user, Permissions.ROLE_UPDATE);
+  const canDeleteRole = hasPermission(user, Permissions.ROLE_DELETE);
+  const canManagePermissions = hasPermission(user, Permissions.ROLE_UPDATE);
 
   useEffect(() => {
     fetchRoles();
@@ -105,6 +111,10 @@ const RolesPage = () => {
   // };
 
   const handleAdd = () => {
+    if (!canCreateRole) {
+      message.error('Bạn không có quyền tạo role.');
+      return;
+    }
     setEditingId(null);
     setEditingRole(null);
     form.resetFields();
@@ -112,6 +122,10 @@ const RolesPage = () => {
   };
 
   const handleEdit = (record: Role) => {
+    if (!canUpdateRole) {
+      message.error('Bạn không có quyền chỉnh sửa role.');
+      return;
+    }
     setEditingId(record.id);
     setEditingRole(record);
     form.setFieldsValue({
@@ -141,6 +155,10 @@ const RolesPage = () => {
   };
 
   const handleDelete = async (roleId: string, roleName: string) => {
+    if (!canDeleteRole) {
+      message.error('Bạn không có quyền xóa role.');
+      return;
+    }
     // Không cho phép xóa các role mặc định
     if (['Admin', 'Manager', 'User'].includes(roleName)) {
       message.error('Không thể xóa các role mặc định của hệ thống');
@@ -174,7 +192,7 @@ const RolesPage = () => {
     }
   };
 
-  const handleSavePermissions = async (values: Record<string, boolean>) => {
+  const handleSavePermissions = async (_values: Record<string, boolean>) => {
     if (!editingRole) return;
 
     // Lấy giá trị từ form thay vì dùng values từ callback
@@ -238,19 +256,23 @@ const RolesPage = () => {
       width: 250,
       fixed: 'right' as const,
       render: (_: unknown, record: Role) => (
-        <Space>
-          {/* Nút quản lý permissions cho tất cả roles */}
-          <Button 
-            icon={<KeyOutlined />} 
-            onClick={() => handleManagePermissions(record)} 
-            size="small"
-          >
-            Permissions
-          </Button>
-          {/* Cho phép chỉnh sửa tất cả roles */}
-          <Button icon={<EditOutlined />} onClick={() => handleEdit(record)} size="small" />
-          {/* Không cho phép xóa role mặc định */}
-          {!['Admin', 'Manager', 'User'].includes(record.name) && (
+          <Space>
+          {/* Nút quản lý permissions - chỉ hiện nếu có quyền */}
+          {canManagePermissions && (
+            <Button 
+              icon={<KeyOutlined />} 
+              onClick={() => handleManagePermissions(record)} 
+              size="small"
+            >
+              Permissions
+            </Button>
+          )}
+          {/* Cho phép chỉnh sửa tất cả roles - chỉ hiện nếu có quyền */}
+          {canUpdateRole && (
+            <Button icon={<EditOutlined />} onClick={() => handleEdit(record)} size="small" />
+          )}
+          {/* Không cho phép xóa role mặc định - chỉ hiện nếu có quyền */}
+          {canDeleteRole && !['Admin', 'Manager', 'User'].includes(record.name) && (
             <Popconfirm
               title="Delete Role"
               description="Are you sure you want to delete this role?"
@@ -283,9 +305,11 @@ const RolesPage = () => {
           </Col>
           <Col xs={24} sm={24} md={12} lg={14}>
             <Space direction="horizontal" wrap style={{ width: '100%', justifyContent: 'flex-end' }}>
-              <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
-                Add Role
-              </Button>
+              {canCreateRole && (
+                <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
+                  Add Role
+                </Button>
+              )}
             </Space>
           </Col>
         </Row>

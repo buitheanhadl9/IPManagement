@@ -1,5 +1,6 @@
 using IPManagement.API.DTOs;
 using IPManagement.API.Services;
+using IPManagement.API.Authorization;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -10,6 +11,7 @@ using System.Security.Claims;
 using System.Threading.Tasks;
 using IPManagement.API.Data;
 using IPManagement.API.Models;
+using Microsoft.AspNetCore.Http;
 
 namespace IPManagement.API.Controllers
 {
@@ -20,14 +22,20 @@ namespace IPManagement.API.Controllers
     {
         private readonly IRoleService _roleService;
         private readonly ApplicationDbContext _context;
+        private readonly IPermissionNotificationService _permissionNotificationService;
 
-        public RolesController(IRoleService roleService, ApplicationDbContext context)
+        public RolesController(
+            IRoleService roleService,
+            ApplicationDbContext context,
+            IPermissionNotificationService permissionNotificationService)
         {
             _roleService = roleService;
             _context = context;
+            _permissionNotificationService = permissionNotificationService;
         }
 
         [HttpGet]
+        [RequirePermission(FunctionCode.ROLE, CommandCode.VIEW)]
         public async Task<ActionResult<IEnumerable<RoleDto>>> GetAllRoles()
         {
             var roles = await _roleService.GetAllRolesAsync();
@@ -35,6 +43,7 @@ namespace IPManagement.API.Controllers
         }
 
         [HttpGet("{roleId}")]
+        [RequirePermission(FunctionCode.ROLE, CommandCode.VIEW)]
         public async Task<ActionResult<RoleDto>> GetRoleById(string roleId)
         {
             var role = await _roleService.GetRoleByIdAsync(roleId);
@@ -45,7 +54,7 @@ namespace IPManagement.API.Controllers
         }
 
         [HttpPost]
-        [Authorize(Roles = "Admin")]
+        [RequirePermission(FunctionCode.ROLE, CommandCode.CREATE)]
         public async Task<ActionResult<RoleDto>> CreateRole([FromBody] CreateRoleRequest request)
         {
             var role = await _roleService.CreateRoleAsync(request);
@@ -56,7 +65,7 @@ namespace IPManagement.API.Controllers
         }
 
         [HttpPut("{roleId}")]
-        [Authorize(Roles = "Admin")]
+        [RequirePermission(FunctionCode.ROLE, CommandCode.UPDATE)]
         public async Task<ActionResult> UpdateRole(string roleId, [FromBody] UpdateRoleRequest request)
         {
             var result = await _roleService.UpdateRoleAsync(roleId, request);
@@ -67,7 +76,7 @@ namespace IPManagement.API.Controllers
         }
 
         [HttpDelete("{roleId}")]
-        [Authorize(Roles = "Admin")]
+        [RequirePermission(FunctionCode.ROLE, CommandCode.DELETE)]
         public async Task<ActionResult> DeleteRole(string roleId)
         {
             var result = await _roleService.DeleteRoleAsync(roleId);
@@ -78,6 +87,7 @@ namespace IPManagement.API.Controllers
         }
 
         [HttpGet("user/{userId}")]
+        [RequirePermission(FunctionCode.ROLE, CommandCode.VIEW)]
         public async Task<ActionResult<IEnumerable<RoleDto>>> GetUserRoles(string userId)
         {
             var roles = await _roleService.GetUserRolesAsync(userId);
@@ -85,7 +95,7 @@ namespace IPManagement.API.Controllers
         }
 
         [HttpPost("user/{userId}/assign")]
-        [Authorize(Roles = "Admin")]
+        [RequirePermission(FunctionCode.ROLE, CommandCode.UPDATE)]
         public async Task<ActionResult> AssignRoleToUser(string userId, [FromBody] AssignRoleToUserRequest request)
         {
             var result = await _roleService.AssignRoleToUserAsync(userId, request.RoleName);
@@ -96,7 +106,7 @@ namespace IPManagement.API.Controllers
         }
 
         [HttpPost("user/{userId}/remove")]
-        [Authorize(Roles = "Admin")]
+        [RequirePermission(FunctionCode.ROLE, CommandCode.UPDATE)]
         public async Task<ActionResult> RemoveRoleFromUser(string userId, [FromBody] RemoveRoleFromUserRequest request)
         {
             var result = await _roleService.RemoveRoleFromUserAsync(userId, request.RoleName);
@@ -110,7 +120,7 @@ namespace IPManagement.API.Controllers
         /// Get permissions for a specific role
         /// </summary>
         [HttpGet("{roleId}/permissions")]
-        [Authorize(Roles = "Admin")]
+        [RequirePermission(FunctionCode.ROLE, CommandCode.VIEW)]
         public async Task<ActionResult<IEnumerable<string>>> GetRolePermissions(string roleId)
         {
             var role = await _context.Roles.FindAsync(roleId);
@@ -129,7 +139,7 @@ namespace IPManagement.API.Controllers
         /// Update permissions for a specific role
         /// </summary>
         [HttpPut("{roleId}/permissions")]
-        [Authorize(Roles = "Admin")]
+        [RequirePermission(FunctionCode.ROLE, CommandCode.UPDATE)]
         public async Task<ActionResult> UpdateRolePermissions(string roleId, [FromBody] IEnumerable<string> permissions)
         {
             var role = await _context.Roles.FindAsync(roleId);
@@ -143,7 +153,8 @@ namespace IPManagement.API.Controllers
             _context.RolePermissions.RemoveRange(existingPermissions);
 
             // Add new permissions
-            foreach (var permission in permissions)
+            var newPermissions = permissions.ToList();
+            foreach (var permission in newPermissions)
             {
                 _context.RolePermissions.Add(new RolePermission
                 {
@@ -153,6 +164,16 @@ namespace IPManagement.API.Controllers
             }
 
             await _context.SaveChangesAsync();
+
+            // Get current user name for notification
+            var currentUser = User.Identity?.Name ?? "Unknown";
+
+            // Send real-time notification to all users in this role
+            await _permissionNotificationService.NotifyPermissionsUpdatedAsync(
+                role.Name,
+                newPermissions.ToArray(),
+                currentUser);
+
             return Ok(new { message = "Permissions updated successfully" });
         }
 

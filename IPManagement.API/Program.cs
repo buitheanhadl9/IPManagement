@@ -4,8 +4,10 @@ using IPManagement.API.Models;
 using IPManagement.API.Services;
 using IPManagement.API.Extensions;
 using IPManagement.API.Authorization;
+using IPManagement.API.Hubs;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
@@ -57,26 +59,18 @@ builder.Services.AddAuthentication(options =>
     };
 });
 
-builder.Services.AddAuthorizationBuilder()
-    .AddPolicy(Permissions.IpCreate, policy => policy.Requirements.Add(new PermissionRequirement(Permissions.IpCreate)))
-    .AddPolicy(Permissions.IpRead, policy => policy.Requirements.Add(new PermissionRequirement(Permissions.IpRead)))
-    .AddPolicy(Permissions.IpUpdate, policy => policy.Requirements.Add(new PermissionRequirement(Permissions.IpUpdate)))
-    .AddPolicy(Permissions.IpDelete, policy => policy.Requirements.Add(new PermissionRequirement(Permissions.IpDelete)))
-    .AddPolicy(Permissions.UnitCreate, policy => policy.Requirements.Add(new PermissionRequirement(Permissions.UnitCreate)))
-    .AddPolicy(Permissions.UnitRead, policy => policy.Requirements.Add(new PermissionRequirement(Permissions.UnitRead)))
-    .AddPolicy(Permissions.UnitUpdate, policy => policy.Requirements.Add(new PermissionRequirement(Permissions.UnitUpdate)))
-    .AddPolicy(Permissions.UnitDelete, policy => policy.Requirements.Add(new PermissionRequirement(Permissions.UnitDelete)))
-    .AddPolicy(Permissions.UserCreate, policy => policy.Requirements.Add(new PermissionRequirement(Permissions.UserCreate)))
-    .AddPolicy(Permissions.UserRead, policy => policy.Requirements.Add(new PermissionRequirement(Permissions.UserRead)))
-    .AddPolicy(Permissions.UserUpdate, policy => policy.Requirements.Add(new PermissionRequirement(Permissions.UserUpdate)))
-    .AddPolicy(Permissions.UserDelete, policy => policy.Requirements.Add(new PermissionRequirement(Permissions.UserDelete)))
-    .AddPolicy(Permissions.RoleCreate, policy => policy.Requirements.Add(new PermissionRequirement(Permissions.RoleCreate)))
-    .AddPolicy(Permissions.RoleRead, policy => policy.Requirements.Add(new PermissionRequirement(Permissions.RoleRead)))
-    .AddPolicy(Permissions.RoleUpdate, policy => policy.Requirements.Add(new PermissionRequirement(Permissions.RoleUpdate)))
-    .AddPolicy(Permissions.RoleDelete, policy => policy.Requirements.Add(new PermissionRequirement(Permissions.RoleDelete)));
+// Register RequirePermissionHandler to handle RequirePermissionAttribute
+builder.Services.AddScoped<IAuthorizationHandler, RequirePermissionHandler>();
 
-// Register PermissionHandler as Scoped to avoid singleton-scoped service dependency issues
-builder.Services.AddScoped<IAuthorizationHandler, PermissionHandler>();
+// Auto-register all permissions from PermissionHelper
+var allPermissions = PermissionHelper.GetAllPermissions();
+var authorizationBuilder = builder.Services.AddAuthorizationBuilder();
+foreach (var permission in allPermissions)
+{
+    var (function, command) = PermissionHelper.ParsePermission(permission);
+    authorizationBuilder.AddPolicy(permission, policy =>
+        policy.Requirements.Add(new RequirePermissionAttribute(function, command)));
+}
 
 // Configure Swagger
 builder.Services.AddEndpointsApiExplorer();
@@ -120,6 +114,13 @@ builder.Services.AddScoped<IIPAddressService, IPAddressService>();
 builder.Services.AddScoped<IUnitService, UnitService>();
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IRoleService, RoleService>();
+builder.Services.AddScoped<IPermissionNotificationService, PermissionNotificationService>();
+
+// Configure SignalR
+builder.Services.AddSignalR(options =>
+{
+    options.EnableDetailedErrors = true;
+});
 
 // Configure CORS
 builder.Services.AddCors(options =>
@@ -129,7 +130,8 @@ builder.Services.AddCors(options =>
         policy.WithOrigins("http://localhost:5173", "http://localhost:5174")
               .AllowAnyHeader()
               .AllowAnyMethod()
-              .AllowCredentials();
+              .AllowCredentials()
+              .WithMethods("GET", "POST", "PUT", "DELETE", "OPTIONS");
     });
 });
 
@@ -153,6 +155,9 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+
+// Map SignalR Hub
+app.MapHub<NotificationHub>("/notificationHub");
 
 // Seed data on startup
 await app.Services.SeedDataAsync();

@@ -64,4 +64,10 @@ namespace IPManagement.API.DTOs
         [Required]
         public string NewPassword { get; set; } = string.Empty;
     }
+
+    public class RefreshTokenRequest
+    {
+        [Required]
+        public string RefreshToken { get; set; } = string.Empty;
+    }
 }

@@ -29,10 +29,6 @@ namespace IPManagement.API.Data
             builder.Entity<ApplicationUser>(entity =>
             {
                 entity.HasKey(e => e.Id);
-                entity.HasOne(e => e.Unit)
-                      .WithMany(u => u.Users)
-                      .HasForeignKey(e => e.UnitId)
-                      .OnDelete(DeleteBehavior.Restrict);
             });
 
             // Configure Unit

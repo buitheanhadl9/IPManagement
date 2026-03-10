@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using IPManagement.API.Data;
 using IPManagement.API.Models;
 using IPManagement.API;
+using IPManagement.API.Authorization;
 
 namespace IPManagement.API.Extensions;
 
@@ -12,33 +13,45 @@ public static class SeedDataExtensions
 {
     private static async Task SeedRolePermissionsAsync(ApplicationDbContext context, ILogger logger)
     {
-        // Check if already seeded
-        if (context.RolePermissions.Any())
+        // Check if already seeded with NEW format (e.g., "ip_address:view")
+        // Old format is like "ip:read", new format is like "ip_address:view"
+        const string newFormatIndicator = "_"; // New format uses underscore (ip_address vs ip)
+        
+        if (context.RolePermissions.Any() && context.RolePermissions.All(rp => rp.Permission.Contains(newFormatIndicator)))
         {
-            logger.LogInformation("Role permissions already seeded, skipping...");
+            logger.LogInformation("Role permissions already seeded with new format, skipping...");
             return;
         }
 
-        // Admin has all permissions
-        var adminPermissions = new[]
+        // Clear existing permissions and migrate to new format
+        if (context.RolePermissions.Any())
         {
-            Permissions.IpCreate, Permissions.IpRead, Permissions.IpUpdate, Permissions.IpDelete,
-            Permissions.UnitCreate, Permissions.UnitRead, Permissions.UnitUpdate, Permissions.UnitDelete,
-            Permissions.UserCreate, Permissions.UserRead, Permissions.UserUpdate, Permissions.UserDelete,
-            Permissions.RoleCreate, Permissions.RoleRead, Permissions.RoleUpdate, Permissions.RoleDelete
-        };
+            logger.LogInformation("Migrating from old permission format to new format...");
+            context.RolePermissions.RemoveRange(context.RolePermissions);
+            await context.SaveChangesAsync();
+        }
 
-        foreach (var permission in adminPermissions)
+        // Admin has all permissions (all function + command combinations)
+        var allPermissions = PermissionHelper.GetAllPermissions();
+        foreach (var permission in allPermissions)
         {
             context.RolePermissions.Add(new RolePermission { RoleName = "Admin", Permission = permission });
         }
 
-        // Manager has IP permissions and read-only for units/users
+        // Manager has full IP permissions, read-only for units/users/roles
         var managerPermissions = new[]
         {
-            Permissions.IpCreate, Permissions.IpRead, Permissions.IpUpdate, Permissions.IpDelete,
-            Permissions.UnitRead,
-            Permissions.UserRead
+            // IP Address - full access
+            PermissionHelper.GetPermission(FunctionCode.IP_ADDRESS, CommandCode.VIEW),
+            PermissionHelper.GetPermission(FunctionCode.IP_ADDRESS, CommandCode.CREATE),
+            PermissionHelper.GetPermission(FunctionCode.IP_ADDRESS, CommandCode.UPDATE),
+            PermissionHelper.GetPermission(FunctionCode.IP_ADDRESS, CommandCode.DELETE),
+            // Unit - read only
+            PermissionHelper.GetPermission(FunctionCode.UNIT, CommandCode.VIEW),
+            // User - read only
+            PermissionHelper.GetPermission(FunctionCode.USER, CommandCode.VIEW),
+            // Role - read only
+            PermissionHelper.GetPermission(FunctionCode.ROLE, CommandCode.VIEW)
         };
 
         foreach (var permission in managerPermissions)
@@ -46,10 +59,23 @@ public static class SeedDataExtensions
             context.RolePermissions.Add(new RolePermission { RoleName = "Manager", Permission = permission });
         }
 
-        // User has read-only permissions
+        // User has permissions for IP and Unit management (create, update, delete), read-only for users/roles
         var userPermissions = new[]
         {
-            Permissions.IpRead, Permissions.UnitRead, Permissions.UserRead, Permissions.RoleRead
+            // IP Address - full access
+            PermissionHelper.GetPermission(FunctionCode.IP_ADDRESS, CommandCode.VIEW),
+            PermissionHelper.GetPermission(FunctionCode.IP_ADDRESS, CommandCode.CREATE),
+            PermissionHelper.GetPermission(FunctionCode.IP_ADDRESS, CommandCode.UPDATE),
+            PermissionHelper.GetPermission(FunctionCode.IP_ADDRESS, CommandCode.DELETE),
+            // Unit - full access
+            PermissionHelper.GetPermission(FunctionCode.UNIT, CommandCode.VIEW),
+            PermissionHelper.GetPermission(FunctionCode.UNIT, CommandCode.CREATE),
+            PermissionHelper.GetPermission(FunctionCode.UNIT, CommandCode.UPDATE),
+            PermissionHelper.GetPermission(FunctionCode.UNIT, CommandCode.DELETE),
+            // User - read only
+            PermissionHelper.GetPermission(FunctionCode.USER, CommandCode.VIEW),
+            // Role - read only
+            PermissionHelper.GetPermission(FunctionCode.ROLE, CommandCode.VIEW)
         };
 
         foreach (var permission in userPermissions)
@@ -58,7 +84,7 @@ public static class SeedDataExtensions
         }
 
         await context.SaveChangesAsync();
-        logger.LogInformation("Seeded role permissions for Admin, Manager, and User roles");
+        logger.LogInformation("Seeded role permissions for Admin, Manager, and User roles using new Function+Command format");
     }
 
     public static async Task SeedDataAsync(this IServiceProvider serviceProvider)
@@ -134,8 +160,8 @@ public static class SeedDataExtensions
                 // Seed sample users for units
                 var sampleUsers = new[]
                 {
-                    new { Username = "it.admin", Email = "it.admin@ipmanagement.com", FullName = "IT Admin", UnitName = "IT Department", Role = "UnitAdmin", Password = "User@123" },
-                    new { Username = "hr.admin", Email = "hr.admin@ipmanagement.com", FullName = "HR Admin", UnitName = "HR Department", Role = "UnitAdmin", Password = "User@123" },
+                    new { Username = "it.admin", Email = "it.admin@ipmanagement.com", FullName = "IT Admin", UnitName = "IT Department", Role = "Manager", Password = "User@123" },
+                    new { Username = "hr.admin", Email = "hr.admin@ipmanagement.com", FullName = "HR Admin", UnitName = "HR Department", Role = "Manager", Password = "User@123" },
                     new { Username = "it.user", Email = "it.user@ipmanagement.com", FullName = "IT Staff", UnitName = "IT Department", Role = "User", Password = "User@123" },
                     new { Username = "hr.user", Email = "hr.user@ipmanagement.com", FullName = "HR Staff", UnitName = "HR Department", Role = "User", Password = "User@123" },
                 };
@@ -153,7 +179,6 @@ public static class SeedDataExtensions
                                 UserName = userData.Username,
                                 Email = userData.Email,
                                 FullName = userData.FullName,
-                                UnitId = unit.Id,
                                 EmailConfirmed = true
                             };
 
@@ -161,6 +186,17 @@ public static class SeedDataExtensions
                             if (result.Succeeded)
                             {
                                 await userManager.AddToRoleAsync(newUser, userData.Role);
+                                
+                                // Create UserUnitAssignment instead of setting UnitId
+                                var assignment = new UserUnitAssignment
+                                {
+                                    UserId = newUser.Id,
+                                    UnitId = unit.Id,
+                                    Role = userData.Role == "Manager" ? "UnitAdmin" : "User",
+                                    IsPrimary = true
+                                };
+                                await context.UserUnitAssignments.AddAsync(assignment);
+                                
                                 logger.LogInformation($"Created user: {userData.Email} ({userData.Role})");
                             }
                         }

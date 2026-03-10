@@ -14,6 +14,8 @@ import {
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../hooks/useAppSelector';
 import { logout } from '../store/slices/authSlice';
+import { hasPermission, Permissions } from '../utils/permissions';
+import { SessionWarning } from '../components/SessionWarning';
 
 const { Header, Sider, Content } = Layout;
 
@@ -48,18 +50,22 @@ const MainLayout = ({ children }: { children: React.ReactNode }) => {
     },
     ];
 
-  // Only show users menu for admins
-  if (user?.roles?.includes('Admin')) {
-    menuItems.push({
-      key: '/users',
-      icon: <TeamOutlined />,
-      label: 'Users',
-    });
-    menuItems.push({
-      key: '/roles',
-      icon: <TeamOutlined />,
-      label: 'Roles',
-    });
+  // Show menu items based on permissions (chỉ khi user đã load)
+  if (user) {
+    if (hasPermission(user, Permissions.USER_READ)) {
+      menuItems.push({
+        key: '/users',
+        icon: <TeamOutlined />,
+        label: 'Users',
+      });
+    }
+    if (hasPermission(user, Permissions.ROLE_READ)) {
+      menuItems.push({
+        key: '/roles',
+        icon: <TeamOutlined />,
+        label: 'Roles',
+      });
+    }
   }
 
   const currentKey = menuItems.find(item => location.pathname.startsWith(item.key))?.key || '/';
@@ -159,6 +165,7 @@ const MainLayout = ({ children }: { children: React.ReactNode }) => {
 
         {/* Main Content */}
         <Content className="main-content">
+          <SessionWarning />
           {children}
         </Content>
       </Layout>

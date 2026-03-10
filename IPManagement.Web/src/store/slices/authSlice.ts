@@ -2,6 +2,7 @@ import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { authService } from '../../services/auth.service';
 import type { User, LoginRequest, AuthState } from '../../types/auth';
+import type { PermissionUpdateNotification } from '../../types/notification';
 
 const initialState: AuthState = {
   user: null,
@@ -9,6 +10,7 @@ const initialState: AuthState = {
   isAuthenticated: !!localStorage.getItem('token'),
   isLoading: false,
   error: null,
+  lastActivity: localStorage.getItem('lastActivity') ? parseInt(localStorage.getItem('lastActivity')!) : null,
 };
 
 export const login = createAsyncThunk(
@@ -27,6 +29,8 @@ export const login = createAsyncThunk(
 export const logout = createAsyncThunk('auth/logout', async () => {
   await authService.logout();
   localStorage.removeItem('token');
+  localStorage.removeItem('refreshToken');
+  localStorage.removeItem('lastActivity');
 });
 
 export const fetchProfile = createAsyncThunk(
@@ -41,12 +45,34 @@ export const fetchProfile = createAsyncThunk(
   }
 );
 
+/**
+ * Thunk để xử lý permissions update notification
+ * Nếu user có role bị thay đổi permissions, sẽ fetch lại profile
+ */
+export const handlePermissionsUpdate = (notification: PermissionUpdateNotification) => {
+  return async (dispatch: any, getState: any) => {
+    const state = getState();
+    const user = state.auth.user;
+    
+    // Kiểm tra nếu user có role trong notification, thì fetch lại profile
+    if (user && user.roles?.includes(notification.roleName)) {
+      console.log('[authSlice] User has role that was updated, fetching new profile...');
+      dispatch(fetchProfile());
+    }
+  };
+};
+
 const authSlice = createSlice({
   name: 'auth',
   initialState,
   reducers: {
     clearError: (state) => {
       state.error = null;
+    },
+    updateLastActivity: (state, action: PayloadAction<number>) => {
+      state.lastActivity = action.payload;
+      // Lưu vào localStorage để persist
+      localStorage.setItem('lastActivity', action.payload.toString());
     },
   },
   extraReducers: (builder) => {
@@ -61,6 +87,9 @@ const authSlice = createSlice({
         state.isAuthenticated = true;
         state.user = action.payload.user;
         state.token = action.payload.token;
+        state.lastActivity = Date.now();
+        localStorage.setItem('lastActivity', Date.now().toString());
+        localStorage.setItem('refreshToken', action.payload.refreshToken);
       })
       .addCase(login.rejected, (state, action) => {
         state.isLoading = false;
@@ -76,9 +105,16 @@ const authSlice = createSlice({
       .addCase(fetchProfile.pending, (state) => {
         state.isLoading = true;
       })
-      .addCase(fetchProfile.fulfilled, (state, action: PayloadAction<User>) => {
+      .addCase(fetchProfile.fulfilled, (state, action: PayloadAction<any>) => {
         state.isLoading = false;
-        state.user = action.payload;
+        // Map backend response (Permissions, Roles) to frontend format (permissions, roles)
+        const userData: User = {
+          ...action.payload,
+          permissions: action.payload.Permissions || action.payload.permissions,
+          roles: action.payload.Roles || action.payload.roles,
+          units: action.payload.Units || action.payload.units,
+        };
+        state.user = userData;
         state.isAuthenticated = true;
       })
       .addCase(fetchProfile.rejected, (state) => {
@@ -91,5 +127,5 @@ const authSlice = createSlice({
   },
 });
 
-export const { clearError } = authSlice.actions;
+export const { clearError, updateLastActivity } = authSlice.actions;
 export default authSlice.reducer;

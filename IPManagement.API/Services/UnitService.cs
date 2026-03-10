@@ -47,7 +47,35 @@ namespace IPManagement.API.Services
                 return Array.Empty<UnitDto>();
             }
 
-            // Get assigned unit IDs for the user (applies to all users including Admin)
+            // Check if user is Admin - Admin can see all units
+            var isAdmin = await IsAdminAsync(user);
+            if (isAdmin)
+            {
+                var allUnitsQuery = _context.Units
+                    .Include(u => u.ParentUnit)
+                    .AsQueryable();
+
+                var allUnits = await allUnitsQuery.OrderBy(u => u.Name).ToListAsync();
+                
+                return allUnits.Select(u => new UnitDto
+                {
+                    Id = u.Id,
+                    ExternalId = u.ExternalId,
+                    Name = u.Name,
+                    Code = u.Code,
+                    Address = u.Address,
+                    ParentUnitId = u.ParentUnitId,
+                    ParentUnitName = u.ParentUnit == null ? null : u.ParentUnit.Name,
+                    Description = u.Description,
+                    Note = u.Note,
+                    CreatedAt = u.CreatedAt,
+                    UpdatedAt = u.UpdatedAt,
+                    IsActive = u.IsActive,
+                    IPAddressCount = CountIPsForUnit(u.Id)
+                }).ToArray();
+            }
+
+            // Get assigned unit IDs for the user
             var assignedUnitIds = await GetAssignedUnitIdsAsync(userId);
             
             // If user has no assigned units, return empty array
@@ -60,12 +88,12 @@ namespace IPManagement.API.Services
             var unitIdsWithChildren = await GetUnitIdsWithChildrenAsync(assignedUnitIds);
 
             // Return only assigned units and their children
-            var query = _context.Units
+            var filteredUnitsQuery = _context.Units
                 .Include(u => u.ParentUnit)
                 .Where(u => unitIdsWithChildren.Contains(u.Id))
                 .AsQueryable();
 
-            var units = await query.OrderBy(u => u.Name).ToListAsync();
+            var units = await filteredUnitsQuery.OrderBy(u => u.Name).ToListAsync();
             
             return units.Select(u => new UnitDto
             {
@@ -99,7 +127,22 @@ namespace IPManagement.API.Services
                 return Array.Empty<UnitTreeDto>();
             }
 
-            // Get assigned unit IDs for the user (applies to all users including Admin)
+            // Check if user is Admin - Admin can see all units
+            var isAdmin = await IsAdminAsync(user);
+            if (isAdmin)
+            {
+                // Get all root units
+                var adminRootUnitsQuery = _context.Units
+                    .Where(u => u.ParentUnitId == null)
+                    .Include(u => u.ChildUnits)
+                    .AsQueryable();
+
+                var adminRootUnits = await adminRootUnitsQuery.ToListAsync();
+
+                return adminRootUnits.Select(u => BuildUnitTree(u)).ToArray();
+            }
+
+            // Get assigned unit IDs for the user
             var assignedUnitIds = await GetAssignedUnitIdsAsync(userId);
             
             // If user has no assigned units, return empty array
@@ -129,12 +172,18 @@ namespace IPManagement.API.Services
             if (!await HasPermissionAsync(user, Permissions.UnitRead))
                 return null;
 
-            // Get assigned unit IDs for the user (applies to all users including Admin)
-            var assignedUnitIds = await GetAssignedUnitIdsAsync(userId);
+            // Check if user is Admin - Admin can see all units
+            var isAdmin = await IsAdminAsync(user);
             
-            // If user has no assigned units or the requested unit is not assigned, return null
-            if (assignedUnitIds.Length == 0 || !assignedUnitIds.Contains(unitId))
-                return null;
+            // For non-admin users, check if they have access to the requested unit
+            if (!isAdmin)
+            {
+                var assignedUnitIds = await GetAssignedUnitIdsAsync(userId);
+                
+                // If user has no assigned units or the requested unit is not assigned, return null
+                if (assignedUnitIds.Length == 0 || !assignedUnitIds.Contains(unitId))
+                    return null;
+            }
 
             var unit = await _context.Units
                 .Include(u => u.ParentUnit)
@@ -144,28 +193,59 @@ namespace IPManagement.API.Services
             if (unit == null)
                 return null;
 
-            return new UnitDto
+            // For non-admin users, filter child units to only include assigned units
+            UnitDto result;
+            if (isAdmin)
             {
-                Id = unit.Id,
-                ExternalId = unit.ExternalId,
-                Name = unit.Name,
-                Code = unit.Code,
-                ParentUnitId = unit.ParentUnitId,
-                ParentUnitName = unit.ParentUnit == null ? null : unit.ParentUnit.Name,
-                Description = unit.Description,
-                CreatedAt = unit.CreatedAt,
-                UpdatedAt = unit.UpdatedAt,
-                IsActive = unit.IsActive,
-                ChildUnits = unit.ChildUnits
-                    .Where(c => assignedUnitIds.Contains(c.Id))
-                    .Select(c => new UnitDto
+                result = new UnitDto
+                {
+                    Id = unit.Id,
+                    ExternalId = unit.ExternalId,
+                    Name = unit.Name,
+                    Code = unit.Code,
+                    ParentUnitId = unit.ParentUnitId,
+                    ParentUnitName = unit.ParentUnit == null ? null : unit.ParentUnit.Name,
+                    Description = unit.Description,
+                    CreatedAt = unit.CreatedAt,
+                    UpdatedAt = unit.UpdatedAt,
+                    IsActive = unit.IsActive,
+                    ChildUnits = unit.ChildUnits?.Select(c => new UnitDto
                     {
                         Id = c.Id,
                         Name = c.Name,
                         Code = c.Code
-                    }).ToArray(),
-                IPAddressCount = unit.IPAddresses.Count
-            };
+                    }).ToArray() ?? Array.Empty<UnitDto>(),
+                    IPAddressCount = unit.IPAddresses.Count
+                };
+            }
+            else
+            {
+                var assignedUnitIds = await GetAssignedUnitIdsAsync(userId);
+                result = new UnitDto
+                {
+                    Id = unit.Id,
+                    ExternalId = unit.ExternalId,
+                    Name = unit.Name,
+                    Code = unit.Code,
+                    ParentUnitId = unit.ParentUnitId,
+                    ParentUnitName = unit.ParentUnit == null ? null : unit.ParentUnit.Name,
+                    Description = unit.Description,
+                    CreatedAt = unit.CreatedAt,
+                    UpdatedAt = unit.UpdatedAt,
+                    IsActive = unit.IsActive,
+                    ChildUnits = unit.ChildUnits
+                        .Where(c => assignedUnitIds.Contains(c.Id))
+                        .Select(c => new UnitDto
+                        {
+                            Id = c.Id,
+                            Name = c.Name,
+                            Code = c.Code
+                        }).ToArray(),
+                    IPAddressCount = unit.IPAddresses.Count
+                };
+            }
+
+            return result;
         }
 
         public async Task<UnitDto> CreateUnitAsync(Guid userId, UnitCreateRequest request)
@@ -197,6 +277,17 @@ namespace IPManagement.API.Services
             };
 
             _context.Units.Add(unit);
+            await _context.SaveChangesAsync();
+
+            // Tự động thêm user vào UserUnitAssignments với vai trò Admin của unit này
+            var assignment = new UserUnitAssignment
+            {
+                UserId = userId.ToString(),
+                UnitId = unit.Id,
+                Role = "Admin",
+                IsPrimary = true
+            };
+            _context.UserUnitAssignments.Add(assignment);
             await _context.SaveChangesAsync();
 
             return new UnitDto
@@ -276,7 +367,7 @@ namespace IPManagement.API.Services
             var unit = await _context.Units
                 .Include(u => u.ChildUnits)
                 .Include(u => u.IPAddresses)
-                .Include(u => u.Users)
+                .Include(u => u.UserUnitAssignments)
                 .FirstOrDefaultAsync(u => u.Id == unitId);
 
             if (unit == null)
@@ -288,8 +379,15 @@ namespace IPManagement.API.Services
             if (unit.IPAddresses.Any())
                 throw new InvalidOperationException("Cannot delete unit with IP addresses. Please delete or reassign IP addresses first.");
 
-            if (unit.Users.Any())
-                throw new InvalidOperationException($"Cannot delete unit because {unit.Users.Count} user(s) are assigned to this unit. Please reassign users to a different unit first.");
+            // Kiểm tra UserUnitAssignments (bảng gán user vào nhiều unit)
+            // Vì mối quan hệ User-Unit được thực hiện qua bảng trung gian, cần xóa các bản ghi này trước khi xóa unit
+            if (unit.UserUnitAssignments.Any())
+            {
+                var uniqueUserIds = unit.UserUnitAssignments.Select(a => a.UserId).Distinct();
+                throw new InvalidOperationException(
+                    $"Cannot delete unit because {uniqueUserIds.Count()} user(s) are assigned to this unit via UserUnitAssignment. " +
+                    $"Please remove the following user assignments first: {string.Join(", ", uniqueUserIds)}");
+            }
 
             _context.Units.Remove(unit);
             await _context.SaveChangesAsync();
@@ -299,10 +397,19 @@ namespace IPManagement.API.Services
         public async Task<UnitDto> GetMyUnitAsync(Guid userId)
         {
             var user = await _context.Users.FindAsync(userId.ToString());
-            if (user == null || user.UnitId == null)
+            if (user == null)
+                throw new UnauthorizedAccessException("User not found");
+
+            // Get the primary unit assignment
+            var assignment = await _context.UserUnitAssignments
+                .Where(a => a.UserId == userId.ToString())
+                .OrderByDescending(a => a.IsPrimary)
+                .FirstOrDefaultAsync();
+            
+            if (assignment == null)
                 throw new UnauthorizedAccessException("User does not belong to any unit");
 
-            var unit = await _context.Units.FindAsync(user.UnitId.Value);
+            var unit = await _context.Units.FindAsync(assignment.UnitId);
             if (unit == null)
                 throw new InvalidOperationException("Unit not found");
 
@@ -343,13 +450,17 @@ namespace IPManagement.API.Services
             if (await IsAdminAsync(user))
                 return true;
 
+            // Check if user is UnitAdmin - check their assigned units via UserUnitAssignments
             if (await IsUnitAdminAsync(user))
             {
-                var unitIds = await GetUnitAndChildUnitIdsAsync(user.UnitId.Value);
-                return unitIds.Contains(unitId);
+                var assignedUnitIds = await GetAssignedUnitIdsAsync(userId);
+                var unitIdsWithChildren = await GetUnitIdsWithChildrenAsync(assignedUnitIds);
+                return unitIdsWithChildren.Contains(unitId);
             }
 
-            return user.UnitId == unitId;
+            // Check if user has access to this unit via UserUnitAssignments
+            return await _context.UserUnitAssignments
+                .AnyAsync(a => a.UserId == userId.ToString() && a.UnitId == unitId);
         }
 
         /// <summary>
@@ -375,13 +486,17 @@ namespace IPManagement.API.Services
             if (await IsAdminAsync(user))
                 return true;
 
+            // Check if user is UnitAdmin - check their assigned units via UserUnitAssignments
             if (await IsUnitAdminAsync(user))
             {
-                var unitIds = await GetUnitAndChildUnitIdsAsync(user.UnitId.Value);
-                return unitIds.Contains(unitId);
+                var assignedUnitIds = await GetAssignedUnitIdsAsync(userId);
+                var unitIdsWithChildren = await GetUnitIdsWithChildrenAsync(assignedUnitIds);
+                return unitIdsWithChildren.Contains(unitId);
             }
 
-            return false;
+            // Check if user has access to this unit via UserUnitAssignments
+            return await _context.UserUnitAssignments
+                .AnyAsync(a => a.UserId == userId.ToString() && a.UnitId == unitId);
         }
 
         private async Task<long[]> GetUnitAndChildUnitIdsAsync(long unitId)

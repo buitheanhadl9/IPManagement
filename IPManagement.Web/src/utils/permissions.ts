@@ -1,33 +1,33 @@
 import type { User } from '../types/auth';
 
-// Permission constants
+// Permission constants - New format: function:command
 export const Permissions = {
   // IP Address permissions
-  IP_CREATE: 'ip:create',
-  IP_READ: 'ip:read',
-  IP_UPDATE: 'ip:update',
-  IP_DELETE: 'ip:delete',
+  IP_CREATE: 'ip_address:create',
+  IP_READ: 'ip_address:view',
+  IP_UPDATE: 'ip_address:update',
+  IP_DELETE: 'ip_address:delete',
   
   // Unit permissions
   UNIT_CREATE: 'unit:create',
-  UNIT_READ: 'unit:read',
+  UNIT_READ: 'unit:view',
   UNIT_UPDATE: 'unit:update',
   UNIT_DELETE: 'unit:delete',
   
   // User permissions
   USER_CREATE: 'user:create',
-  USER_READ: 'user:read',
+  USER_READ: 'user:view',
   USER_UPDATE: 'user:update',
   USER_DELETE: 'user:delete',
   
   // Role permissions
   ROLE_CREATE: 'role:create',
-  ROLE_READ: 'role:read',
+  ROLE_READ: 'role:view',
   ROLE_UPDATE: 'role:update',
   ROLE_DELETE: 'role:delete',
   
   // Audit log permissions
-  AUDIT_READ: 'audit:read',
+  AUDIT_READ: 'audit_log:view',
 };
 
 // Role constants

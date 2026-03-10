@@ -5,7 +5,7 @@ import type { Unit, UnitCreateRequest, UnitUpdateRequest } from '../types/unit';
 import { unitService } from '../services/unit.service';
 import { useNavigate } from 'react-router-dom';
 import { useAppSelector } from '../hooks/useAppSelector';
-import { isAdmin } from '../utils/permissions';
+import { hasPermission, Permissions } from '../utils/permissions';
 
 const { Title } = Typography;
 const { Search } = Input;
@@ -21,10 +21,10 @@ const UnitsPage = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const navigate = useNavigate();
 
-  // Check permissions - only Admin can create, update, delete units
-  const canCreateUnit = isAdmin(user);
-  const canUpdateUnit = isAdmin(user);
-  const canDeleteUnit = isAdmin(user);
+  // Check permissions based on user permissions
+  const canCreateUnit = hasPermission(user, Permissions.UNIT_CREATE);
+  const canUpdateUnit = hasPermission(user, Permissions.UNIT_UPDATE);
+  const canDeleteUnit = hasPermission(user, Permissions.UNIT_DELETE);
 
   useEffect(() => {
     fetchUnits();
@@ -57,7 +57,7 @@ const UnitsPage = () => {
 
   const handleAdd = () => {
     if (!canCreateUnit) {
-      message.error('Bạn không có quyền thêm đơn vị. Chỉ Admin mới được thêm đơn vị.');
+      message.error('Bạn không có quyền thêm đơn vị.');
       return;
     }
     setEditingId(null);
@@ -67,7 +67,7 @@ const UnitsPage = () => {
 
   const handleEdit = (record: Unit) => {
     if (!canUpdateUnit) {
-      message.error('Bạn không có quyền chỉnh sửa đơn vị. Chỉ Admin mới được chỉnh sửa đơn vị.');
+      message.error('Bạn không có quyền chỉnh sửa đơn vị.');
       return;
     }
     setEditingId(record.id);
@@ -85,7 +85,7 @@ const UnitsPage = () => {
 
   const handleDelete = async (id: number) => {
     if (!canDeleteUnit) {
-      message.error('Bạn không có quyền xóa đơn vị. Chỉ Admin mới được xóa đơn vị.');
+      message.error('Bạn không có quyền xóa đơn vị.');
       return;
     }
     try {

@@ -1,5 +1,6 @@
 using IPManagement.API.DTOs;
 using IPManagement.API.Services;
+using IPManagement.API.Authorization;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System;
@@ -21,6 +22,7 @@ namespace IPManagement.API.Controllers
         }
 
         [HttpGet]
+        [RequirePermission(FunctionCode.UNIT, CommandCode.VIEW)]
         public async Task<ActionResult<UnitDto[]>> GetAllUnits()
         {
             var userId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value!);
@@ -29,6 +31,7 @@ namespace IPManagement.API.Controllers
         }
 
         [HttpGet("tree")]
+        [RequirePermission(FunctionCode.UNIT, CommandCode.VIEW)]
         public async Task<ActionResult<UnitTreeDto[]>> GetUnitTree()
         {
             var userId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value!);
@@ -37,6 +40,7 @@ namespace IPManagement.API.Controllers
         }
 
         [HttpGet("{unitId}")]
+        [RequirePermission(FunctionCode.UNIT, CommandCode.VIEW)]
         public async Task<ActionResult<UnitDto>> GetUnit(long unitId)
         {
             var userId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value!);
@@ -48,6 +52,7 @@ namespace IPManagement.API.Controllers
         }
 
         [HttpGet("my-unit")]
+        [RequirePermission(FunctionCode.UNIT, CommandCode.VIEW)]
         public async Task<ActionResult<UnitDto>> GetMyUnit()
         {
             var userId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value!);
@@ -71,6 +76,7 @@ namespace IPManagement.API.Controllers
         }
 
         [HttpPost]
+        [RequirePermission(FunctionCode.UNIT, CommandCode.CREATE)]
         public async Task<ActionResult<UnitDto>> CreateUnit([FromBody] UnitCreateRequest request)
         {
             var userId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value!);
@@ -90,6 +96,7 @@ namespace IPManagement.API.Controllers
         }
 
         [HttpPut("{unitId}")]
+        [RequirePermission(FunctionCode.UNIT, CommandCode.UPDATE)]
         public async Task<ActionResult<UnitDto>> UpdateUnit(long unitId, [FromBody] UnitUpdateRequest request)
         {
             var userId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value!);
@@ -112,6 +119,7 @@ namespace IPManagement.API.Controllers
         }
 
         [HttpDelete("{unitId}")]
+        [RequirePermission(FunctionCode.UNIT, CommandCode.DELETE)]
         public async Task<ActionResult> DeleteUnit(long unitId)
         {
             var userId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value!);

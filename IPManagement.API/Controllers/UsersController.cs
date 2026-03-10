@@ -1,5 +1,6 @@
 using IPManagement.API.DTOs;
 using IPManagement.API.Services;
+using IPManagement.API.Authorization;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System;
@@ -21,6 +22,7 @@ namespace IPManagement.API.Controllers
         }
 
         [HttpGet]
+        [RequirePermission(FunctionCode.USER, CommandCode.VIEW)]
         public async Task<ActionResult<UserListResponse>> GetUsers(
             [FromQuery] int pageNumber = 1,
             [FromQuery] int pageSize = 10,
@@ -32,6 +34,7 @@ namespace IPManagement.API.Controllers
         }
 
         [HttpGet("{userId}")]
+        [RequirePermission(FunctionCode.USER, CommandCode.VIEW)]
         public async Task<ActionResult<UserDetailDto>> GetUser(Guid userId)
         {
             var currentUserId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value!);
@@ -43,6 +46,7 @@ namespace IPManagement.API.Controllers
         }
 
         [HttpPost]
+        [RequirePermission(FunctionCode.USER, CommandCode.CREATE)]
         public async Task<ActionResult<UserDetailDto>> CreateUser([FromBody] UserCreateRequest request)
         {
             var userId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value!);
@@ -62,6 +66,7 @@ namespace IPManagement.API.Controllers
         }
 
         [HttpPut("{userId}")]
+        [RequirePermission(FunctionCode.USER, CommandCode.UPDATE)]
         public async Task<ActionResult<UserDetailDto>> UpdateUser(Guid userId, [FromBody] UserUpdateRequest request)
         {
             var currentUserId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value!);
@@ -80,6 +85,7 @@ namespace IPManagement.API.Controllers
         }
 
         [HttpDelete("{userId}")]
+        [RequirePermission(FunctionCode.USER, CommandCode.DELETE)]
         public async Task<ActionResult> DeleteUser(Guid userId)
         {
             var currentUserId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value!);

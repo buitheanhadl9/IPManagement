@@ -1,5 +1,6 @@
 using IPManagement.API.DTOs;
 using IPManagement.API.Services;
+using IPManagement.API.Authorization;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System;
@@ -21,6 +22,7 @@ namespace IPManagement.API.Controllers
         }
 
         [HttpGet]
+        [RequirePermission(FunctionCode.IP_ADDRESS, CommandCode.VIEW)]
         public async Task<ActionResult<IPAddressListResponse>> GetIPAddresses(
             [FromQuery] int pageNumber = 1,
             [FromQuery] int pageSize = 10,
@@ -34,6 +36,7 @@ namespace IPManagement.API.Controllers
         }
 
         [HttpGet("{ipId}")]
+        [RequirePermission(FunctionCode.IP_ADDRESS, CommandCode.VIEW)]
         public async Task<ActionResult<IPAddressDto>> GetIPAddress(long ipId)
         {
             var userId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value!);
@@ -45,6 +48,7 @@ namespace IPManagement.API.Controllers
         }
 
         [HttpPost]
+        [RequirePermission(FunctionCode.IP_ADDRESS, CommandCode.CREATE)]
         public async Task<ActionResult<IPAddressDto>> CreateIPAddress([FromBody] IPAddressCreateRequest request)
         {
             Console.WriteLine($"=== CreateIPAddress called ===");
@@ -82,6 +86,7 @@ namespace IPManagement.API.Controllers
         }
 
         [HttpPut("{ipId}")]
+        [RequirePermission(FunctionCode.IP_ADDRESS, CommandCode.UPDATE)]
         public async Task<ActionResult<IPAddressDto>> UpdateIPAddress(long ipId, [FromBody] IPAddressUpdateRequest request)
         {
             var userId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value!);
@@ -100,6 +105,7 @@ namespace IPManagement.API.Controllers
         }
 
         [HttpDelete("{ipId}")]
+        [RequirePermission(FunctionCode.IP_ADDRESS, CommandCode.DELETE)]
         public async Task<ActionResult> DeleteIPAddress(long ipId)
         {
             var userId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value!);
@@ -118,6 +124,7 @@ namespace IPManagement.API.Controllers
         }
 
         [HttpPost("check-status")]
+        [RequirePermission(FunctionCode.IP_ADDRESS, CommandCode.VIEW)]
         public async Task<ActionResult<IPAddressDto[]>> CheckStatus([FromBody] CheckIPStatusRequest request)
         {
             var userId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value!);
@@ -126,6 +133,7 @@ namespace IPManagement.API.Controllers
         }
 
         [HttpGet("duplicates")]
+        [RequirePermission(FunctionCode.IP_ADDRESS, CommandCode.VIEW)]
         public async Task<ActionResult<IPAddressDto[]>> GetDuplicates()
         {
             var userId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value!);

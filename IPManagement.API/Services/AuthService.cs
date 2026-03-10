@@ -67,8 +67,11 @@ namespace IPManagement.API.Services
             var token = GenerateJwtToken(user);
             var refreshToken = GenerateRefreshToken();
 
-            // Save refresh token (you might want to store this in a database)
-            user.LockoutEnd = DateTimeOffset.UtcNow.AddMinutes(5); // Example: store token expiry
+            // Save refresh token to database
+            user.RefreshToken = refreshToken;
+            user.RefreshTokenExpiry = DateTime.UtcNow.AddDays(_jwtSettings.RefreshTokenExpirationDays);
+            user.LastActivity = DateTime.UtcNow;
+            await _context.SaveChangesAsync();
 
             var roles = await _userManager.GetRolesAsync(user);
             
@@ -120,8 +123,71 @@ namespace IPManagement.API.Services
 
         public async Task<LoginResponse?> RefreshTokenAsync(string refreshToken)
         {
-            // Implement refresh token logic
-            return null;
+            if (string.IsNullOrWhiteSpace(refreshToken))
+                return null;
+
+            // Tìm user có refresh token này trong database
+            var user = await _context.Users
+                .FirstOrDefaultAsync(u => u.RefreshToken == refreshToken && u.RefreshTokenExpiry > DateTime.UtcNow);
+            
+            if (user == null || !user.IsActive)
+                return null;
+
+            // Tạo token mới
+            var token = GenerateJwtToken(user);
+            var newRefreshToken = GenerateRefreshToken();
+
+            // Cập nhật refresh token và last activity
+            user.RefreshToken = newRefreshToken;
+            user.RefreshTokenExpiry = DateTime.UtcNow.AddDays(_jwtSettings.RefreshTokenExpirationDays);
+            user.LastActivity = DateTime.UtcNow;
+
+            // Load unit assignments
+            await _context.Entry(user)
+                .Collection(u => u.UserUnitAssignments)
+                .Query()
+                .Include(ua => ua.Unit)
+                .LoadAsync();
+
+            var roles = await _userManager.GetRolesAsync(user);
+            var unitAssignments = user.UserUnitAssignments
+                .Select(ua => new UserUnitDto
+                {
+                    Id = ua.UnitId,
+                    Name = ua.Unit.Name,
+                    Role = ua.Role,
+                    IsPrimary = ua.IsPrimary
+                })
+                .ToArray();
+
+            var primaryUnitName = user.UserUnitAssignments
+                .Where(ua => ua.IsPrimary)
+                .Select(ua => ua.Unit.Name)
+                .FirstOrDefault();
+
+            var permissions = await _userManager.GetPermissionsAsync(user, _context);
+
+            // Save changes to user
+            await _context.SaveChangesAsync();
+
+            return new LoginResponse
+            {
+                Token = token,
+                RefreshToken = newRefreshToken,
+                ExpiresAt = DateTime.UtcNow.AddMinutes(_jwtSettings.AccessTokenExpirationMinutes),
+                User = new UserDto
+                {
+                    Id = Guid.Parse(user.Id),
+                    Username = user.UserName!,
+                    Email = user.Email!,
+                    FullName = user.FullName,
+                    Phone = user.Phone,
+                    Units = unitAssignments,
+                    UnitName = primaryUnitName,
+                    Roles = roles.ToArray(),
+                    Permissions = permissions.ToArray()
+                }
+            };
         }
 
         public async Task<UserDetailDto?> GetUserByIdAsync(Guid userId)
@@ -200,13 +266,19 @@ namespace IPManagement.API.Services
 
             var permissionClaims = permissions.Select(p => new Claim("permission", p));
 
+            // Get primary unit assignment for the user (synchronous)
+            var primaryUnitId = _context.UserUnitAssignments
+                .Where(ua => ua.UserId == user.Id && ua.IsPrimary)
+                .Select(ua => ua.UnitId)
+                .FirstOrDefault();
+            
             var claims = new[]
             {
                 new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
                 new Claim(ClaimTypes.Name, user.UserName!),
                 new Claim(ClaimTypes.Email, user.Email!),
                 new Claim("FullName", user.FullName ?? string.Empty),
-                new Claim("UnitId", user.UnitId?.ToString() ?? string.Empty)
+                new Claim("UnitId", primaryUnitId > 0 ? primaryUnitId.ToString() : string.Empty)
             }.Concat(roleClaims).Concat(permissionClaims);
 
             var token = new JwtSecurityToken(

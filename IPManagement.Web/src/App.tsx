@@ -4,6 +4,8 @@ import { Provider } from 'react-redux';
 import { store } from './store/store';
 import { useAppDispatch } from './hooks/useAppSelector';
 import { fetchProfile } from './store/slices/authSlice';
+import { useUserActivity } from './hooks/useUserActivity';
+import { useSignalR } from './hooks/useSignalR';
 import PrivateRoute from './components/PrivateRoute';
 import MainLayout from './layouts/MainLayout';
 import LoginPage from './pages/LoginPage';
@@ -15,15 +17,31 @@ import UsersPage from './pages/UsersPage';
 import SettingsPage from './pages/SettingsPage';
 import RolesPage from './pages/RolesPage';
 
+function ActivityTracker() {
+  useUserActivity();
+  return null;
+}
+
+function SignalRConnector() {
+  useSignalR();
+  return null;
+}
+
 function AuthChecker() {
   const dispatch = useAppDispatch();
 
   useEffect(() => {
     const token = localStorage.getItem('token');
+    console.log('[AuthChecker] Token exists:', !!token);
     if (token) {
+      console.log('[AuthChecker] Fetching profile...');
       dispatch(fetchProfile())
         .unwrap()
-        .catch(() => {
+        .then((user) => {
+          console.log('[AuthChecker] Profile fetched successfully:', user);
+        })
+        .catch((error) => {
+          console.error('[AuthChecker] Failed to fetch profile:', error);
           localStorage.removeItem('token');
         });
     }
@@ -35,7 +53,9 @@ function AuthChecker() {
 function AppContent() {
   return (
     <>
+      <ActivityTracker />
       <AuthChecker />
+      <SignalRConnector />
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route

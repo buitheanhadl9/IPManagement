@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Mvc;
 using System;
 using System.Security.Claims;
 using System.Threading.Tasks;
+using System.Threading;
 
 namespace IPManagement.API.Controllers
 {
@@ -70,6 +71,20 @@ namespace IPManagement.API.Controllers
                 return BadRequest(new { message = "Failed to reset password" });
 
             return Ok(new { message = "Password reset successfully" });
+        }
+
+        [HttpPost("refresh-token")]
+        [AllowAnonymous]
+        public async Task<ActionResult<LoginResponse>> RefreshToken([FromBody] RefreshTokenRequest request)
+        {
+            if (string.IsNullOrWhiteSpace(request.RefreshToken))
+                return BadRequest(new { message = "Refresh token is required" });
+
+            var result = await _authService.RefreshTokenAsync(request.RefreshToken);
+            if (result == null)
+                return Unauthorized(new { message = "Invalid refresh token" });
+
+            return Ok(result);
         }
     }
 }

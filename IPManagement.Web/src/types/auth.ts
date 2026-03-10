@@ -23,6 +23,10 @@ export interface LoginRequest {
   password: string;
 }
 
+export interface RefreshTokenRequest {
+  refreshToken: string;
+}
+
 export interface LoginResponse {
   token: string;
   refreshToken: string;
@@ -36,4 +40,5 @@ export interface AuthState {
   isAuthenticated: boolean;
   isLoading: boolean;
   error: string | null;
+  lastActivity: number | null;
 }

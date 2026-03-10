@@ -35,7 +35,7 @@ namespace IPManagement.API.Services
 
         public async Task<IPAddressListResponse> GetIPAddressesAsync(Guid userId, int pageNumber, int pageSize, string? searchTerm, long? unitId, string? status)
         {
-            var user = await _context.Users.Include(u => u.Unit).FirstOrDefaultAsync(u => u.Id == userId.ToString());
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId.ToString());
             if (user == null)
                 return new IPAddressListResponse { Items = Array.Empty<IPAddressDto>() };
 
@@ -371,14 +371,30 @@ namespace IPManagement.API.Services
 
             if (!await IsAdminAsync(user))
             {
-                if (await IsUnitAdminAsync(user))
+                // Get user's assigned units via UserUnitAssignments
+                var userUnitIds = user.UserUnitAssignments.Select(ua => ua.UnitId).ToArray();
+                
+                if (userUnitIds.Length > 0)
                 {
-                    var unitIds = await GetUnitAndChildUnitIdsAsync(user.UnitId.Value);
-                    query = query.Where(ip => unitIds.Contains(ip.UnitId));
-                }
-                else if (user.UnitId.HasValue)
-                {
-                    query = query.Where(ip => ip.UnitId == user.UnitId.Value);
+                    if (await IsUnitAdminAsync(user))
+                    {
+                        // UnitAdmin can access unit and child units
+                        var allAllowedUnitIds = new HashSet<long>();
+                        foreach (var uId in userUnitIds)
+                        {
+                            var childUnitIds = await GetUnitAndChildUnitIdsAsync(uId);
+                            foreach (var id in childUnitIds)
+                            {
+                                allAllowedUnitIds.Add(id);
+                            }
+                        }
+                        query = query.Where(ip => allAllowedUnitIds.Contains(ip.UnitId));
+                    }
+                    else
+                    {
+                        // Regular user can only access assigned units
+                        query = query.Where(ip => userUnitIds.Contains(ip.UnitId));
+                    }
                 }
             }
 

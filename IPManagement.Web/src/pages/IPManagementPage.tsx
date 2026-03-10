@@ -36,11 +36,14 @@ const IPManagementPage = () => {
   }, [searchTerm, statusFilter, unitIdFilter]);
 
   const fetchIPAddresses = async () => {
+    console.log('[IPManagementPage] fetchIPAddresses called with:', { searchTerm, unitIdFilter, statusFilter });
     setLoading(true);
     try {
       const response = await ipService.getIPAddresses(1, 100, searchTerm || undefined, unitIdFilter || undefined, statusFilter || undefined);
+      console.log('[IPManagementPage] fetchIPAddresses response:', response.items.length, 'items');
       setIPAddresses(response.items);
     } catch (error: any) {
+      console.error('[IPManagementPage] fetchIPAddresses error:', error);
       message.error('Failed to fetch IP addresses: ' + (error?.response?.data?.message || error?.message));
     } finally {
       setLoading(false);

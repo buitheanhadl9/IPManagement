@@ -5,11 +5,10 @@ import type { User, UserCreateRequest, UserUpdateRequest, UserUnitAssignmentRequ
 import { userService } from '../services/user.service';
 import { unitService } from '../services/unit.service';
 import { roleService } from '../services/role.service';
-import type { Unit } from '../types/unit';
 import type { Role } from '../types/role';
 import { format } from 'date-fns';
 import { useAppSelector } from '../hooks/useAppSelector';
-import { isAdmin } from '../utils/permissions';
+import { hasPermission, Permissions } from '../utils/permissions';
 import { authService } from '../services/auth.service';
 
 const { Title } = Typography;
@@ -42,10 +41,10 @@ const UsersPage = () => {
   const [unitAssignments, setUnitAssignments] = useState<UnitAssignmentForm[]>([]);
   const [assignAllUnits, setAssignAllUnits] = useState(false);
 
-  // Check permissions - only Admin can create, update, delete users
-  const canCreateUser = isAdmin(user);
-  const canUpdateUser = isAdmin(user);
-  const canDeleteUser = isAdmin(user);
+  // Check permissions based on user permissions
+  const canCreateUser = hasPermission(user, Permissions.USER_CREATE);
+  const canUpdateUser = hasPermission(user, Permissions.USER_UPDATE);
+  const canDeleteUser = hasPermission(user, Permissions.USER_DELETE);
 
   useEffect(() => {
     fetchUsers();
@@ -156,8 +155,8 @@ const UsersPage = () => {
   };
 
   const handleResetPassword = (userId: string) => {
-    if (!isAdmin(user)) {
-      message.error('Chỉ Admin mới được đổi mật khẩu cho user khác.');
+    if (!hasPermission(user, Permissions.USER_UPDATE)) {
+      message.error('Bạn không có quyền đổi mật khẩu cho user khác.');
       return;
     }
     setResetPasswordUserId(userId);
@@ -379,7 +378,7 @@ const UsersPage = () => {
       fixed: 'right' as const,
       render: (_: unknown, record: User) => (
         <Space>
-          {isAdmin(user) && (
+          {hasPermission(user, Permissions.USER_UPDATE) && (
             <Button
               icon={<LockOutlined />}
               onClick={() => handleResetPassword(record.id)}

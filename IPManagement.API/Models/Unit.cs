@@ -28,8 +28,6 @@ namespace IPManagement.API.Models
         
         public ICollection<IPAddressRecord> IPAddresses { get; set; } = new List<IPAddressRecord>();
         
-        public virtual ICollection<ApplicationUser> Users { get; set; } = new List<ApplicationUser>();
-        
         public ICollection<UserUnitAssignment> UserUnitAssignments { get; set; } = new List<UserUnitAssignment>();
         
         [StringLength(1000)]

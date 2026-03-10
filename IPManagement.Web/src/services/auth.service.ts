@@ -23,4 +23,9 @@ export const authService = {
   adminResetPassword: async (userId: string, newPassword: string): Promise<void> => {
     await api.post(`/auth/admin/users/${userId}/reset-password`, { newPassword });
   },
+
+  refreshToken: async (refreshToken: string): Promise<LoginResponse> => {
+    const response = await api.post<LoginResponse>('/auth/refresh-token', { refreshToken });
+    return response.data;
+  },
 };
