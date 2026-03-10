@@ -26,11 +26,16 @@ const IPManagementPage = () => {
   const [units, setUnits] = useState<{ id: number; name: string }[]>([]);
   
   // Check permissions (dùng Unified Roles - level cao nhất trong units áp dụng toàn hệ thống)
+  const canReadIP = hasPermission(user, Permissions.IP_READ);
   const canCreateIP = hasPermission(user, Permissions.IP_CREATE);
   const canUpdateIP = hasPermission(user, Permissions.IP_UPDATE);
   const canDeleteIP = hasPermission(user, Permissions.IP_DELETE);
 
+  // Không fetch dữ liệu nếu không có quyền IP_READ
   useEffect(() => {
+    if (!canReadIP) {
+      return;
+    }
     fetchIPAddresses();
     fetchUnits();
   }, [searchTerm, statusFilter, unitIdFilter]);
@@ -222,6 +227,21 @@ const IPManagementPage = () => {
       },
     },
   ];
+
+  // Nếu không có quyền IP_READ, hiển thị thông báo
+  if (!canReadIP) {
+    return (
+      <Card>
+        <div style={{ textAlign: 'center', padding: '40px 20px' }}>
+          <div style={{ fontSize: '48px', marginBottom: '16px' }}>🚫</div>
+          <h2 style={{ color: '#ff4d4f', marginBottom: '16px' }}>Không có quyền truy cập</h2>
+          <p style={{ color: '#666', marginBottom: '24px' }}>
+            Bạn không có quyền xem danh sách IP Address. Vui lòng liên hệ quản trị viên để được cấp quyền.
+          </p>
+        </div>
+      </Card>
+    );
+  }
 
   return (
     <div>

@@ -54,6 +54,15 @@ namespace IPManagement.API.Services
             var isAdmin = userRoles.Contains("Admin");
             var isUnitAdmin = userRoles.Contains("UnitAdmin");
             
+            // Kiểm tra quyền IP_READ - user cần có quyền này mới được xem IP
+            var hasIpReadPermission = await _userManager.HasPermissionAsync(user, "ip_address:view", _context);
+            
+            // Nếu không có quyền IP_READ và không phải admin, trả về danh sách rỗng
+            if (!hasIpReadPermission && !isAdmin)
+            {
+                return new IPAddressListResponse { Items = Array.Empty<IPAddressDto>() };
+            }
+            
             // Nếu không phải admin, giới hạn theo units được gán
             if (!isAdmin)
             {

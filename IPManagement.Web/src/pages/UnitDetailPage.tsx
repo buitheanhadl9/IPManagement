@@ -31,9 +31,17 @@ const UnitDetailPage = () => {
   const canCreateIP = useMemo(() => hasPermission(user, Permissions.IP_CREATE), [user]);
   const canUpdateIP = useMemo(() => hasPermission(user, Permissions.IP_UPDATE), [user]);
   const canDeleteIP = useMemo(() => hasPermission(user, Permissions.IP_DELETE), [user]);
+  const canReadIP = useMemo(() => hasPermission(user, Permissions.IP_READ), [user]);
 
   // Kiểm tra quyền truy cập unit - use useMemo to re-calculate when user or id changes
-  const hasUnitAccess = useMemo(() => id ? isAssignedToUnit(user, parseInt(id)) : false, [user, id]);
+  // User cần có quyền IP_READ và được gán vào đơn vị (hoặc là Admin) mới được truy cập
+  const hasUnitAccess = useMemo(() => {
+    if (!id) return false;
+    // Admin có thể truy cập mọi đơn vị
+    if (isAdmin(user)) return true;
+    // User thường cần có quyền IP_READ VÀ được gán vào đơn vị
+    return canReadIP && isAssignedToUnit(user, parseInt(id));
+  }, [user, id, canReadIP]);
   
   useEffect(() => {
     if (id) {

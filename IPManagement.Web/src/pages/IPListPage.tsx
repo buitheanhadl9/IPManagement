@@ -30,11 +30,16 @@ const IPListPage = () => {
   const [form] = Form.useForm();
 
   // Check permissions - use useMemo to re-calculate when user changes
+  const canReadIP = useMemo(() => hasPermission(user, Permissions.IP_READ), [user]);
   const canCreateIP = useMemo(() => hasPermission(user, Permissions.IP_CREATE), [user]);
   const canUpdateIP = useMemo(() => hasPermission(user, Permissions.IP_UPDATE), [user]);
   const canDeleteIP = useMemo(() => hasPermission(user, Permissions.IP_DELETE), [user]);
 
+  // Không fetch dữ liệu nếu không có quyền IP_READ
   useEffect(() => {
+    if (!canReadIP) {
+      return;
+    }
     fetchIPAddresses();
     fetchUnits();
 
@@ -217,6 +222,21 @@ const IPListPage = () => {
       ),
     },
   ];
+
+  // Nếu không có quyền IP_READ, hiển thị thông báo
+  if (!canReadIP) {
+    return (
+      <Card>
+        <div style={{ textAlign: 'center', padding: '40px 20px' }}>
+          <div style={{ fontSize: '48px', marginBottom: '16px' }}>🚫</div>
+          <h2 style={{ color: '#ff4d4f', marginBottom: '16px' }}>Không có quyền truy cập</h2>
+          <p style={{ color: '#666', marginBottom: '24px' }}>
+            Bạn không có quyền xem danh sách IP Address. Vui lòng liên hệ quản trị viên để được cấp quyền.
+          </p>
+        </div>
+      </Card>
+    );
+  }
 
   return (
     <div>
