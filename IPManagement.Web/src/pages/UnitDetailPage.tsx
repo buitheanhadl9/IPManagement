@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Table, Button, Modal, Form, Input, Select, message, Space, Popconfirm, Card, Row, Col, Typography, Tag, Breadcrumb } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined, ArrowLeftOutlined } from '@ant-design/icons';
@@ -8,6 +8,8 @@ import { unitService } from '../services/unit.service';
 import type { Unit } from '../types/unit';
 import { useAppSelector } from '../hooks/useAppSelector';
 import { hasPermission, Permissions, isAssignedToUnit, isAdmin } from '../utils/permissions';
+import { signalRService } from '../services/signalr.service';
+import type { UnitUpdateNotification, PermissionUpdateNotification } from '../types/notification';
 
 const { Title } = Typography;
 
@@ -25,13 +27,13 @@ const UnitDetailPage = () => {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [form] = Form.useForm();
 
-  // Check permissions (dùng Unified Roles - level cao nhất trong units áp dụng toàn hệ thống)
-  const canCreateIP = hasPermission(user, Permissions.IP_CREATE);
-  const canUpdateIP = hasPermission(user, Permissions.IP_UPDATE);
-  const canDeleteIP = hasPermission(user, Permissions.IP_DELETE);
+  // Check permissions - use useMemo to re-calculate when user changes
+  const canCreateIP = useMemo(() => hasPermission(user, Permissions.IP_CREATE), [user]);
+  const canUpdateIP = useMemo(() => hasPermission(user, Permissions.IP_UPDATE), [user]);
+  const canDeleteIP = useMemo(() => hasPermission(user, Permissions.IP_DELETE), [user]);
 
-  // Kiểm tra quyền truy cập unit
-  const hasUnitAccess = id ? isAssignedToUnit(user, parseInt(id)) : false;
+  // Kiểm tra quyền truy cập unit - use useMemo to re-calculate when user or id changes
+  const hasUnitAccess = useMemo(() => id ? isAssignedToUnit(user, parseInt(id)) : false, [user, id]);
   
   useEffect(() => {
     if (id) {
@@ -44,6 +46,36 @@ const UnitDetailPage = () => {
       fetchUnit();
       fetchIPAddresses();
     }
+
+    // Listen for unit update notifications
+    const unsubscribeUnit = signalRService.onUnitUpdated((notification: UnitUpdateNotification) => {
+      console.log('[UnitDetailPage] Unit update notification received:', notification);
+      
+      // Nếu notification liên quan đến unit hiện tại
+      if (id && notification.unitId === parseInt(id)) {
+        if (notification.action === 'Deleted') {
+          message.warning(`Đơn vị "${notification.unitName}" đã được xóa. Quay về danh sách.`);
+          navigate('/units');
+        } else {
+          message.success(`Đơn vị đã được cập nhật.`);
+          fetchUnit();
+        }
+      }
+    });
+
+    // Listen for permissions update notifications - to refresh when permissions change
+    const unsubscribePermissions = signalRService.onPermissionsUpdated((notification: PermissionUpdateNotification) => {
+      // Re-fetch data when permissions change (user may have lost access)
+      if (id) {
+        fetchUnit();
+        fetchIPAddresses();
+      }
+    });
+
+    return () => {
+      unsubscribeUnit();
+      unsubscribePermissions();
+    };
   }, [id, hasUnitAccess]);
 
   const fetchUnit = async () => {

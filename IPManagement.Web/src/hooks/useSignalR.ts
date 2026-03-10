@@ -2,8 +2,14 @@ import { useEffect, useRef } from 'react';
 import { useAppDispatch, useAppSelector } from './useAppSelector';
 import { handlePermissionsUpdate } from '../store/slices/authSlice';
 import { signalRService } from '../services/signalr.service';
-import type { PermissionUpdateNotification } from '../types/notification';
+import type { PermissionUpdateNotification, UnitUpdateNotification } from '../types/notification';
 import { message } from 'antd';
+
+// Debounce state để tránh hiển thị nhiều thông báo trùng lặp
+const debounceState = {
+  lastNotificationTime: 0,
+  lastRoleName: ''
+};
 
 /**
  * Hook để quản lý SignalR connection và subscription
@@ -11,44 +17,88 @@ import { message } from 'antd';
 export const useSignalR = () => {
   const dispatch = useAppDispatch();
   const user = useAppSelector((state) => state.auth.user);
-  const isConnectedRef = useRef(false);
+  const connectionInitializedRef = useRef(false);
+  const unsubscribeRef = useRef<() => void>(() => {});
+  const userRef = useRef(user);
+
+  // Cập nhật userRef khi user thay đổi
+  userRef.current = user;
 
   useEffect(() => {
     // Chỉ kết nối khi user đã login
     if (!user) {
-      if (isConnectedRef.current) {
-        console.log('[useSignalR] User logged out, stopping connection...');
+      if (connectionInitializedRef.current) {
         signalRService.stopConnection();
-        isConnectedRef.current = false;
+        connectionInitializedRef.current = false;
+        unsubscribeRef.current();
       }
       return;
     }
 
-    // Khởi tạo connection nếu chưa có
+    // Nếu đã khởi tạo connection rồi thì không khởi tạo lại
+    if (connectionInitializedRef.current) {
+      return;
+    }
+
+    // Khởi tạo connection
     const initConnection = async () => {
       try {
         await signalRService.startConnection();
-        isConnectedRef.current = true;
+        connectionInitializedRef.current = true;
 
         // Join vào group của tất cả roles mà user có
         user.roles?.forEach((role) => {
           signalRService.joinRoleGroup(role);
         });
 
-        // Setup listener cho PermissionsUpdated event
-        const unsubscribe = signalRService.onPermissionsUpdated((notification: PermissionUpdateNotification) => {
+        // Setup listener cho PermissionsUpdated event - chỉ setup một lần
+        const unsubscribePermissions = signalRService.onPermissionsUpdated((notification: PermissionUpdateNotification) => {
+          // Kiểm tra nếu user hiện tại có role bị thay đổi permissions
+          const userHasRole = user?.roles?.includes(notification.roleName);
+          
+          if (!userHasRole) return;
+          
           // Dispatch action để fetch lại profile nếu cần
           dispatch(handlePermissionsUpdate(notification));
+          
+          // Debounce: chỉ hiển thị notification nếu đã qua ít nhất 3 giây kể từ lần cuối
+          // hoặc nếu role name khác với lần cuối
+          const now = Date.now();
+          const isSameRole = debounceState.lastRoleName === notification.roleName;
+          const timeSinceLastNotification = now - debounceState.lastNotificationTime;
+          
+          if (isSameRole && timeSinceLastNotification < 3000) {
+            // Lọc bỏ notification trùng lặp trong vòng 3 giây
+            return;
+          }
+          
+          // Cập nhật debounce state
+          debounceState.lastNotificationTime = now;
+          debounceState.lastRoleName = notification.roleName;
           
           // Hiển thị notification cho user
           message.success({
             content: `Quyền của role "${notification.roleName}" đã được cập nhật. Giao diện sẽ tự động đồng bộ.`,
             duration: 5,
+            key: `perm-${notification.roleName}-${now}`,
           });
         });
 
-        // Cleanup khi unmount
-        return unsubscribe;
+        // Setup listener cho UnitUpdated event - để refresh khi có thay đổi về đơn vị
+        const unsubscribeUnit = signalRService.onUnitUpdated((notification: UnitUpdateNotification) => {
+          message.info({
+            content: `Đơn vị "${notification.unitName || 'được cập nhật'}" đã thay đổi. Trang sẽ tự động làm mới.`,
+            duration: 5,
+          });
+          // Trigger reload trang để cập nhật dữ liệu
+          window.location.reload();
+        });
+
+        // Lưu unsubscribe function để cleanup sau
+        unsubscribeRef.current = () => {
+          unsubscribePermissions();
+          unsubscribeUnit();
+        };
       } catch (error) {
         console.error('[useSignalR] Failed to initialize connection:', error);
       }
@@ -56,27 +106,13 @@ export const useSignalR = () => {
 
     initConnection();
 
-    // Cleanup khi unmount hoặc user thay đổi
+    // Cleanup khi unmount hoặc user logout
     return () => {
-      // Unsubscribe từ tất cả groups
-      user?.roles?.forEach((role) => {
+      unsubscribeRef.current();
+      connectionInitializedRef.current = false;
+      userRef.current?.roles?.forEach((role) => {
         signalRService.leaveRoleGroup(role);
       });
     };
-  }, [user, dispatch]);
-
-  // Re-join groups khi roles thay đổi
-  useEffect(() => {
-    if (!user || !isConnectedRef.current) return;
-
-    const currentRoles = user.roles || [];
-    
-    // Join vào groups mới
-    currentRoles.forEach((role) => {
-      signalRService.joinRoleGroup(role);
-    });
-
-    // Leave khỏi groups cũ (không còn trong roles hiện tại)
-    // Lưu ý: Trong thực tế, bạn có thể cần lưu trạng thái cũ để so sánh
-  }, [user?.roles]);
+  }, [dispatch, user?.id]); // Chỉ chạy lại khi user id thay đổi (user mới login)
 };

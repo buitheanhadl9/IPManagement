@@ -9,6 +9,17 @@ export interface PermissionUpdateNotification {
 }
 
 /**
+ * DTO cho unit update notification từ backend
+ */
+export interface UnitUpdateNotification {
+  unitId: number;
+  unitName?: string;
+  action: 'Created' | 'Updated' | 'Deleted';
+  updatedAt: string;
+  updatedBy?: string;
+}
+
+/**
  * Event types cho SignalR notifications
  */
-export type NotificationType = 'PermissionsUpdated' | 'UserNotification';
+export type NotificationType = 'PermissionsUpdated' | 'UserNotification' | 'UnitUpdated';

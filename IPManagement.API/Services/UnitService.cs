@@ -3,6 +3,8 @@ using IPManagement.API.DTOs;
 using IPManagement.API.Models;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.SignalR;
+using IPManagement.API.Hubs;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -20,17 +22,26 @@ namespace IPManagement.API.Services
         Task<bool> DeleteUnitAsync(Guid userId, long unitId);
         Task<UnitDto> GetMyUnitAsync(Guid userId);
         Task<UnitSelectionDto[]> GetAllUnitsForSelectionAsync();
+        Task NotifyUnitChangeAsync(long unitId, string action, string? updatedBy);
     }
 
     public class UnitService : IUnitService
     {
         private readonly ApplicationDbContext _context;
         private readonly UserManager<ApplicationUser> _userManager;
+        private readonly IHubContext<NotificationHub> _hubContext;
+        private readonly ILogger<UnitService> _logger;
 
-        public UnitService(ApplicationDbContext context, UserManager<ApplicationUser> userManager)
+        public UnitService(
+            ApplicationDbContext context,
+            UserManager<ApplicationUser> userManager,
+            IHubContext<NotificationHub> hubContext,
+            ILogger<UnitService> logger)
         {
             _context = context;
             _userManager = userManager;
+            _hubContext = hubContext;
+            _logger = logger;
         }
 
         public async Task<UnitDto[]> GetAllUnitsAsync(Guid userId)
@@ -290,6 +301,11 @@ namespace IPManagement.API.Services
             _context.UserUnitAssignments.Add(assignment);
             await _context.SaveChangesAsync();
 
+            // Gửi notification đến các user liên quan
+            var currentUser = await _userManager.FindByIdAsync(userId.ToString());
+            var createdBy = currentUser?.UserName ?? "Unknown";
+            await NotifyUnitChangeAsync(unit.Id, "Created", createdBy);
+
             return new UnitDto
             {
                 Id = unit.Id,
@@ -315,6 +331,19 @@ namespace IPManagement.API.Services
             if (!await HasPermissionAsync(user, Permissions.UnitUpdate))
                 throw new UnauthorizedAccessException("You do not have permission to update units");
 
+            // Check if user is Admin - Admin can update all units
+            var isAdmin = await IsAdminAsync(user);
+            
+            // For non-admin users, check if they have access to the requested unit via Unit Assignments
+            if (!isAdmin)
+            {
+                var assignedUnitIds = await GetAssignedUnitIdsAsync(userId);
+                var unitIdsWithChildren = await GetUnitIdsWithChildrenAsync(assignedUnitIds);
+                
+                if (assignedUnitIds.Length == 0 || !unitIdsWithChildren.Contains(unitId))
+                    throw new UnauthorizedAccessException("You do not have access to update this unit");
+            }
+
             var unit = await _context.Units.FindAsync(unitId);
             if (unit == null)
                 return null;
@@ -337,6 +366,11 @@ namespace IPManagement.API.Services
             unit.UpdatedAt = DateTime.UtcNow;
 
             await _context.SaveChangesAsync();
+
+            // Gửi notification đến các user liên quan
+            var currentUser = await _userManager.FindByIdAsync(userId.ToString());
+            var updatedBy = currentUser?.UserName ?? "Unknown";
+            await NotifyUnitChangeAsync(unit.Id, "Updated", updatedBy);
 
             return new UnitDto
             {
@@ -364,6 +398,19 @@ namespace IPManagement.API.Services
             if (!await HasPermissionAsync(user, Permissions.UnitDelete))
                 throw new UnauthorizedAccessException("You do not have permission to delete units");
 
+            // Check if user is Admin - Admin can delete all units
+            var isAdmin = await IsAdminAsync(user);
+            
+            // For non-admin users, check if they have access to the requested unit via Unit Assignments
+            if (!isAdmin)
+            {
+                var assignedUnitIds = await GetAssignedUnitIdsAsync(userId);
+                var unitIdsWithChildren = await GetUnitIdsWithChildrenAsync(assignedUnitIds);
+                
+                if (assignedUnitIds.Length == 0 || !unitIdsWithChildren.Contains(unitId))
+                    throw new UnauthorizedAccessException("You do not have access to delete this unit");
+            }
+
             var unit = await _context.Units
                 .Include(u => u.ChildUnits)
                 .Include(u => u.IPAddresses)
@@ -379,18 +426,53 @@ namespace IPManagement.API.Services
             if (unit.IPAddresses.Any())
                 throw new InvalidOperationException("Cannot delete unit with IP addresses. Please delete or reassign IP addresses first.");
 
-            // Kiểm tra UserUnitAssignments (bảng gán user vào nhiều unit)
-            // Vì mối quan hệ User-Unit được thực hiện qua bảng trung gian, cần xóa các bản ghi này trước khi xóa unit
-            if (unit.UserUnitAssignments.Any())
+            // Lưu danh sách user assignments trước khi xóa để gửi notification
+            var userAssignments = unit.UserUnitAssignments.ToList();
+            var unitName = unit.Name;
+
+            // Xóa các bản ghi UserUnitAssignment trước khi xóa unit
+            if (userAssignments.Any())
             {
-                var uniqueUserIds = unit.UserUnitAssignments.Select(a => a.UserId).Distinct();
-                throw new InvalidOperationException(
-                    $"Cannot delete unit because {uniqueUserIds.Count()} user(s) are assigned to this unit via UserUnitAssignment. " +
-                    $"Please remove the following user assignments first: {string.Join(", ", uniqueUserIds)}");
+                _context.UserUnitAssignments.RemoveRange(userAssignments);
             }
 
             _context.Units.Remove(unit);
             await _context.SaveChangesAsync();
+
+            // Gửi notification đến các user liên quan sau khi xóa
+            var currentUser = await _userManager.FindByIdAsync(userId.ToString());
+            var updatedBy = currentUser?.UserName ?? "Unknown";
+            
+            // Gửi notification trực tiếp với danh sách user đã lưu
+            if (userAssignments.Any())
+            {
+                var notification = new UnitUpdateNotificationDto
+                {
+                    UnitId = unit.Id,
+                    UnitName = unitName,
+                    Action = "Deleted",
+                    UpdatedAt = DateTime.UtcNow,
+                    UpdatedBy = updatedBy
+                };
+
+                // Gửi đến group của mỗi user (thay vì Clients.User)
+                foreach (var assignment in userAssignments)
+                {
+                    var targetUser = await _userManager.FindByIdAsync(assignment.UserId);
+                    if (targetUser != null)
+                    {
+                        var roles = await _userManager.GetRolesAsync(targetUser);
+                        foreach (var role in roles)
+                        {
+                            await _hubContext.Clients.Group($"role:{role}")
+                                .SendAsync("UnitUpdated", notification);
+                        }
+                    }
+                }
+
+                _logger.LogInformation($"Sent unit deleted notification for unit '{unitName}' (ID: {unitId}) to {userAssignments.Count} users");
+            }
+
             return true;
         }
 
@@ -651,6 +733,51 @@ namespace IPManagement.API.Services
                 Name = u.Name,
                 Code = u.Code
             }).ToArray();
+        }
+
+        /// <summary>
+        /// Gửi notification đến tất cả user liên quan đến unit khi có thay đổi
+        /// </summary>
+        public async Task NotifyUnitChangeAsync(long unitId, string action, string? updatedBy)
+        {
+            try
+            {
+                // Lấy thông tin unit
+                var unit = await _context.Units.FindAsync(unitId);
+                if (unit == null)
+                    return;
+
+                // Tìm tất cả user được gán vào unit này
+                var assignments = await _context.UserUnitAssignments
+                    .Where(a => a.UnitId == unitId)
+                    .ToListAsync();
+
+                if (assignments.Count == 0)
+                    return;
+
+                // Tạo notification
+                var notification = new UnitUpdateNotificationDto
+                {
+                    UnitId = unit.Id,
+                    UnitName = unit.Name,
+                    Action = action,
+                    UpdatedAt = DateTime.UtcNow,
+                    UpdatedBy = updatedBy
+                };
+
+                // Gửi notification đến từng user
+                foreach (var assignment in assignments)
+                {
+                    await _hubContext.Clients.User(assignment.UserId)
+                        .SendAsync("UnitUpdated", notification);
+                }
+
+                _logger.LogInformation($"Sent unit change notification for unit '{unit.Name}' (ID: {unitId}) - Action: {action}");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to send unit change notification for unit ID '{UnitId}'", unitId);
+            }
         }
     }
 }

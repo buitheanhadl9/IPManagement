@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Table, Button, Modal, Form, Input, Select, message, Space, Popconfirm, Row, Col, Card } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import type { IPAddress, IPAddressCreateRequest, IPAddressUpdateRequest } from '../types/ip';
@@ -8,6 +8,8 @@ import type { Unit } from '../types/unit';
 import UnitTreeComponent from '../components/UnitTree';
 import { useAppSelector } from '../hooks/useAppSelector';
 import { hasPermission, Permissions } from '../utils/permissions';
+import { signalRService } from '../services/signalr.service';
+import type { PermissionUpdateNotification } from '../types/notification';
 
 const IPListPage = () => {
   const user = useAppSelector((state) => state.auth.user);
@@ -27,16 +29,24 @@ const IPListPage = () => {
   const [selectedUnitName, setSelectedUnitName] = useState<string | null>(null);
   const [form] = Form.useForm();
 
-  // Check permissions
-  console.log('=== IPListPage User Info ===');
-  console.log('User:', user);
-  const canCreateIP = hasPermission(user, Permissions.IP_CREATE);
-  const canUpdateIP = hasPermission(user, Permissions.IP_UPDATE);
-  const canDeleteIP = hasPermission(user, Permissions.IP_DELETE);
+  // Check permissions - use useMemo to re-calculate when user changes
+  const canCreateIP = useMemo(() => hasPermission(user, Permissions.IP_CREATE), [user]);
+  const canUpdateIP = useMemo(() => hasPermission(user, Permissions.IP_UPDATE), [user]);
+  const canDeleteIP = useMemo(() => hasPermission(user, Permissions.IP_DELETE), [user]);
 
   useEffect(() => {
     fetchIPAddresses();
     fetchUnits();
+
+    // Listen for permissions update notifications - to refresh IP list when permissions change
+    const unsubscribePermissions = signalRService.onPermissionsUpdated((notification: PermissionUpdateNotification) => {
+      // Re-fetch IP addresses when permissions change
+      fetchIPAddresses();
+    });
+
+    return () => {
+      unsubscribePermissions();
+    };
   }, [selectedUnitId]);
 
   const fetchUnits = async () => {

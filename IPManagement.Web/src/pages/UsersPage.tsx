@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Table, Button, Modal, Form, Input, Select, message, Space, Popconfirm, Tag, Card, Row, Col, Typography, Breadcrumb, Checkbox, Switch } from 'antd';
 import { PlusOutlined, EditOutlined, SearchOutlined, ReloadOutlined, PlusCircleOutlined, DeleteOutlined as DeleteCircleOutlined, LockOutlined } from '@ant-design/icons';
 import type { User, UserCreateRequest, UserUpdateRequest, UserUnitAssignmentRequest } from '../types/user';
@@ -10,6 +10,8 @@ import { format } from 'date-fns';
 import { useAppSelector } from '../hooks/useAppSelector';
 import { hasPermission, Permissions } from '../utils/permissions';
 import { authService } from '../services/auth.service';
+import { signalRService } from '../services/signalr.service';
+import type { UnitUpdateNotification, PermissionUpdateNotification } from '../types/notification';
 
 const { Title } = Typography;
 const { Search } = Input;
@@ -41,16 +43,37 @@ const UsersPage = () => {
   const [unitAssignments, setUnitAssignments] = useState<UnitAssignmentForm[]>([]);
   const [assignAllUnits, setAssignAllUnits] = useState(false);
 
-  // Check permissions based on user permissions
-  const canCreateUser = hasPermission(user, Permissions.USER_CREATE);
-  const canUpdateUser = hasPermission(user, Permissions.USER_UPDATE);
-  const canDeleteUser = hasPermission(user, Permissions.USER_DELETE);
+  // Check permissions - use useMemo to re-calculate when user changes
+  const canCreateUser = useMemo(() => hasPermission(user, Permissions.USER_CREATE), [user]);
+  const canUpdateUser = useMemo(() => hasPermission(user, Permissions.USER_UPDATE), [user]);
+  const canDeleteUser = useMemo(() => hasPermission(user, Permissions.USER_DELETE), [user]);
 
   useEffect(() => {
     fetchUsers();
     fetchUnits();
     fetchSystemRoles();
   }, [currentPage, pageSize, unitFilter, roleFilter]);
+
+  // Listen to unit and permissions updates via SignalR
+  useEffect(() => {
+    const unsubscribeUnit = signalRService.onUnitUpdated((notification: UnitUpdateNotification) => {
+      console.log('[UsersPage] Received UnitUpdated notification:', notification);
+      // Refresh units list and users list when unit changes
+      fetchUnits();
+      fetchUsers();
+    });
+
+    // Listen to permissions updates via SignalR
+    const unsubscribePermissions = signalRService.onPermissionsUpdated((notification: PermissionUpdateNotification) => {
+      // Refresh users list when permissions change
+      fetchUsers();
+    });
+
+    return () => {
+      unsubscribeUnit();
+      unsubscribePermissions();
+    };
+  }, []);
 
   const fetchSystemRoles = async () => {
     try {

@@ -509,8 +509,44 @@ namespace IPManagement.API.Services
                 return false;
 
             var userRoles = await _userManager.GetRolesAsync(user);
-            // Only Admin and UnitAdmin can edit
-            return userRoles.Contains("Admin") || userRoles.Contains("UnitAdmin");
+            
+            // Admin can edit all IP addresses
+            if (userRoles.Contains("Admin"))
+                return true;
+            
+            // Get the IP address to check its unit
+            var ip = await _context.IPAddresses.Include(ip => ip.Unit).FirstOrDefaultAsync(ip => ip.Id == ipId);
+            if (ip == null)
+                return false;
+
+            // Load user unit assignments
+            await _context.Entry(user)
+                .Collection(u => u.UserUnitAssignments)
+                .Query()
+                .Include(ua => ua.Unit)
+                .LoadAsync();
+
+            var userUnitIds = user.UserUnitAssignments.Select(ua => ua.UnitId).ToArray();
+            if (userUnitIds.Length == 0)
+                return false;
+
+            // UnitAdmin can edit IP addresses in their assigned units and child units
+            if (userRoles.Contains("UnitAdmin"))
+            {
+                var allAllowedUnitIds = new HashSet<long>();
+                foreach (var uId in userUnitIds)
+                {
+                    var childUnitIds = await GetUnitAndChildUnitIdsAsync(uId);
+                    foreach (var id in childUnitIds)
+                    {
+                        allAllowedUnitIds.Add(id);
+                    }
+                }
+                return allAllowedUnitIds.Contains(ip.UnitId);
+            }
+
+            // Regular user cannot edit IP addresses (only view)
+            return false;
         }
 
         private async Task<bool> CanDeleteIPAddressAsync(Guid userId, long ipId)

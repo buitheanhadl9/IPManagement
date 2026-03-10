@@ -156,3 +156,98 @@ export const isAssignedToUnit = (user: User | undefined | null, unitId: number):
   if (!user || !user.units || user.units.length === 0) return false;
   return user.units.some(u => u.id === unitId);
 };
+
+/**
+ * Kiểm tra quyền của user trên unit cụ thể
+ * Permission chỉ áp dụng nếu user được gán vào unit đó
+ */
+export const hasPermissionOnUnit = (
+  user: User | undefined | null, 
+  permission: string, 
+  unitId: number
+): boolean => {
+  if (!user) return false;
+  
+  // Kiểm tra xem user có được gán vào unit này không
+  if (!isAssignedToUnit(user, unitId)) {
+    return false;
+  }
+  
+  // Kiểm tra permission
+  return hasPermission(user, permission);
+};
+
+/**
+ * Kiểm tra quyền của user trên bất kỳ unit được gán nào
+ * Trả về true nếu user có permission trên ít nhất một unit được gán
+ */
+export const hasPermissionOnAnyAssignedUnit = (
+  user: User | undefined | null, 
+  permission: string
+): boolean => {
+  if (!user) return false;
+  
+  // Nếu user không có unit assignment nào
+  if (!user.units || user.units.length === 0) {
+    return false;
+  }
+  
+  // Kiểm tra permission trên bất kỳ unit nào
+  return hasPermission(user, permission);
+};
+
+/**
+ * Kiểm tra nếu user có thể xem unit cụ thể
+ */
+export const canViewUnit = (user: User | undefined | null, unitId: number): boolean => {
+  return hasPermissionOnUnit(user, Permissions.UNIT_READ, unitId);
+};
+
+/**
+ * Kiểm tra nếu user có thể tạo unit (không cần unit assignment)
+ */
+export const canCreateUnit = (user: User | undefined | null): boolean => {
+  return hasPermission(user, Permissions.UNIT_CREATE);
+};
+
+/**
+ * Kiểm tra nếu user có thể sửa unit cụ thể
+ */
+export const canUpdateUnit = (user: User | undefined | null, unitId: number): boolean => {
+  return hasPermissionOnUnit(user, Permissions.UNIT_UPDATE, unitId);
+};
+
+/**
+ * Kiểm tra nếu user có thể xóa unit cụ thể
+ */
+export const canDeleteUnit = (user: User | undefined | null, unitId: number): boolean => {
+  return hasPermissionOnUnit(user, Permissions.UNIT_DELETE, unitId);
+};
+
+/**
+ * Kiểm tra nếu user có thể xem IP address trên unit cụ thể
+ */
+export const canViewIPOnUnit = (user: User | undefined | null, unitId: number): boolean => {
+  return hasPermissionOnUnit(user, Permissions.IP_READ, unitId);
+};
+
+/**
+ * Kiểm tra nếu user có thể tạo IP address trên unit cụ thể
+ */
+export const canCreateIPOnUnit = (user: User | undefined | null, unitId: number): boolean => {
+  return hasPermissionOnUnit(user, Permissions.IP_CREATE, unitId);
+};
+
+/**
+ * Kiểm tra nếu user có thể sửa IP address trên unit cụ thể
+ */
+export const canUpdateIPOnUnit = (user: User | undefined | null, unitId: number): boolean => {
+  return hasPermissionOnUnit(user, Permissions.IP_UPDATE, unitId);
+};
+
+/**
+ * Kiểm tra nếu user có thể xóa IP address trên unit cụ thể
+ */
+export const canDeleteIPOnUnit = (user: User | undefined | null, unitId: number): boolean => {
+  return hasPermissionOnUnit(user, Permissions.IP_DELETE, unitId);
+};

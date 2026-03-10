@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.SignalR;
+using Microsoft.AspNetCore.Authorization;
 
 namespace IPManagement.API.Hubs;
 
@@ -26,7 +27,9 @@ public class NotificationHub : Hub
 
     public override async Task OnConnectedAsync()
     {
-        Console.WriteLine($"Connection {Context.ConnectionId} connected to NotificationHub");
+        // Set UserIdentifier để SignalR có thể map userId đến connection
+        var userId = Context.UserIdentifier;
+        Console.WriteLine($"Connection {Context.ConnectionId} connected to NotificationHub, UserIdentifier: {userId}");
         await base.OnConnectedAsync();
     }
 

@@ -1,5 +1,5 @@
 import { HubConnectionBuilder, HubConnection, HubConnectionState, LogLevel } from '@microsoft/signalr';
-import type { PermissionUpdateNotification } from '../types/notification';
+import type { PermissionUpdateNotification, UnitUpdateNotification } from '../types/notification';
 
 const SIGNALR_HUB_URL = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5001';
 
@@ -12,6 +12,7 @@ class SignalRService {
   // Callbacks cho các event
   private onPermissionsUpdatedCallbacks: ((notification: PermissionUpdateNotification) => void)[] = [];
   private onUserNotificationCallbacks: ((message: string) => void)[] = [];
+  private onUnitUpdatedCallbacks: ((notification: UnitUpdateNotification) => void)[] = [];
   private onConnectedCallbacks: (() => void)[] = [];
   private onDisconnectedCallbacks: (() => void)[] = [];
 
@@ -19,13 +20,15 @@ class SignalRService {
    * Khởi tạo SignalR connection
    */
   public async startConnection(): Promise<void> {
+    console.log('[SignalR] startConnection called, connection exists:', !!this.connection);
     if (this.connection) {
-      console.log('[SignalR] Connection already exists');
+      console.log('[SignalR] Connection already exists, state:', this.connection.state);
       return;
     }
 
     try {
       const token = localStorage.getItem('token');
+      console.log('[SignalR] Token exists:', !!token);
       
       this.connection = new HubConnectionBuilder()
         .withUrl(`${SIGNALR_HUB_URL}/notificationHub`, {
@@ -74,6 +77,12 @@ class SignalRService {
     this.connection.on('UserNotification', (message: string) => {
       console.log('[SignalR] UserNotification received:', message);
       this.onUserNotificationCallbacks.forEach(cb => cb(message));
+    });
+
+    // Handle UnitUpdated event
+    this.connection.on('UnitUpdated', (notification: UnitUpdateNotification) => {
+      console.log('[SignalR] UnitUpdated received:', notification);
+      this.onUnitUpdatedCallbacks.forEach(cb => cb(notification));
     });
 
     // Handle close event
@@ -133,6 +142,16 @@ class SignalRService {
     this.onUserNotificationCallbacks.push(callback);
     return () => {
       this.onUserNotificationCallbacks = this.onUserNotificationCallbacks.filter(cb => cb !== callback);
+    };
+  }
+
+  /**
+   * Đăng ký callback cho UnitUpdated event
+   */
+  public onUnitUpdated(callback: (notification: UnitUpdateNotification) => void): () => void {
+    this.onUnitUpdatedCallbacks.push(callback);
+    return () => {
+      this.onUnitUpdatedCallbacks = this.onUnitUpdatedCallbacks.filter(cb => cb !== callback);
     };
   }
 

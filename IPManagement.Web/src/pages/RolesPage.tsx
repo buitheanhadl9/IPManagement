@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Table, Button, Modal, Form, Input, message, Space, Tag, Card, Row, Col, Typography, Breadcrumb, Popconfirm, Checkbox, Divider } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined, UserOutlined, KeyOutlined } from '@ant-design/icons';
 import { roleService } from '../services/role.service';
@@ -68,26 +68,29 @@ const RolesPage = () => {
   // const [allPermissions, setAllPermissions] = useState<string[]>([]);
   const [permissionsLoading, setPermissionsLoading] = useState(false);
 
-  // Chỉ Admin mới được vào trang này
-  if (!hasPermission(user, Permissions.ROLE_READ)) {
+  // Check permissions based on user permissions - use useMemo to re-calculate when user changes
+  const canCreateRole = useMemo(() => user ? hasPermission(user, Permissions.ROLE_CREATE) : false, [user]);
+  const canUpdateRole = useMemo(() => user ? hasPermission(user, Permissions.ROLE_UPDATE) : false, [user]);
+  const canDeleteRole = useMemo(() => user ? hasPermission(user, Permissions.ROLE_DELETE) : false, [user]);
+  const canManagePermissions = useMemo(() => user ? hasPermission(user, Permissions.ROLE_UPDATE) : false, [user]);
+  const hasAccess = useMemo(() => user ? hasPermission(user, Permissions.ROLE_READ) : false, [user]);
+
+  // useEffect phải được gọi trước khi return sớm
+  useEffect(() => {
+    if (user && hasAccess) {
+      fetchRoles();
+    }
+  }, [user, hasAccess]);
+
+  // Nếu chưa có user hoặc không có quyền, hiển thị thông báo
+  if (!user || !hasAccess) {
     return (
       <div>
         <Title level={2}>Không có quyền truy cập</Title>
-        <p>Bạn không có quyền truy cập trang quản lý role.</p>
+        <p>{!user ? 'Đang tải thông tin người dùng...' : 'Bạn không có quyền truy cập trang quản lý role.'}</p>
       </div>
     );
   }
-
-  // Check permissions based on user permissions
-  const canCreateRole = hasPermission(user, Permissions.ROLE_CREATE);
-  const canUpdateRole = hasPermission(user, Permissions.ROLE_UPDATE);
-  const canDeleteRole = hasPermission(user, Permissions.ROLE_DELETE);
-  const canManagePermissions = hasPermission(user, Permissions.ROLE_UPDATE);
-
-  useEffect(() => {
-    fetchRoles();
-    // fetchAllPermissions();
-  }, []);
 
   const fetchRoles = async () => {
     setLoading(true);

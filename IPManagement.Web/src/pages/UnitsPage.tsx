@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Table, Button, Modal, Form, Input, Select, message, Space, Popconfirm, Tag, Card, Row, Col, Typography } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined, SearchOutlined } from '@ant-design/icons';
 import type { Unit, UnitCreateRequest, UnitUpdateRequest } from '../types/unit';
@@ -6,6 +6,8 @@ import { unitService } from '../services/unit.service';
 import { useNavigate } from 'react-router-dom';
 import { useAppSelector } from '../hooks/useAppSelector';
 import { hasPermission, Permissions } from '../utils/permissions';
+import { signalRService } from '../services/signalr.service';
+import type { UnitUpdateNotification, PermissionUpdateNotification } from '../types/notification';
 
 const { Title } = Typography;
 const { Search } = Input;
@@ -21,13 +23,40 @@ const UnitsPage = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const navigate = useNavigate();
 
-  // Check permissions based on user permissions
-  const canCreateUnit = hasPermission(user, Permissions.UNIT_CREATE);
-  const canUpdateUnit = hasPermission(user, Permissions.UNIT_UPDATE);
-  const canDeleteUnit = hasPermission(user, Permissions.UNIT_DELETE);
+  // Check permissions based on user permissions - use useMemo to re-calculate when user changes
+  const canCreateUnit = useMemo(() => hasPermission(user, Permissions.UNIT_CREATE), [user]);
+  const canUpdateUnit = useMemo(() => hasPermission(user, Permissions.UNIT_UPDATE), [user]);
+  const canDeleteUnit = useMemo(() => hasPermission(user, Permissions.UNIT_DELETE), [user]);
 
   useEffect(() => {
     fetchUnits();
+
+    // Listen for unit update notifications
+    const unsubscribeUnit = signalRService.onUnitUpdated((notification: UnitUpdateNotification) => {
+      console.log('[UnitsPage] Unit update notification received:', notification);
+      
+      // Refresh units list when any unit changes
+      if (notification.action === 'Deleted') {
+        message.success(`Đơn vị "${notification.unitName}" đã được xóa.`);
+      } else if (notification.action === 'Created') {
+        message.success(`Đơn vị "${notification.unitName}" đã được tạo.`);
+      } else {
+        message.success(`Đơn vị "${notification.unitName}" đã được cập nhật.`);
+      }
+      
+      fetchUnits();
+    });
+
+    // Listen for permissions update notifications - to refresh units list when permissions change
+    const unsubscribePermissions = signalRService.onPermissionsUpdated((notification: PermissionUpdateNotification) => {
+      // Re-fetch units list when permissions change (user may have lost access to some units)
+      fetchUnits();
+    });
+
+    return () => {
+      unsubscribeUnit();
+      unsubscribePermissions();
+    };
   }, []);
 
   useEffect(() => {

@@ -56,7 +56,6 @@ export const handlePermissionsUpdate = (notification: PermissionUpdateNotificati
     
     // Kiểm tra nếu user có role trong notification, thì fetch lại profile
     if (user && user.roles?.includes(notification.roleName)) {
-      console.log('[authSlice] User has role that was updated, fetching new profile...');
       dispatch(fetchProfile());
     }
   };

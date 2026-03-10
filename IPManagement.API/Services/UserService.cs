@@ -3,6 +3,8 @@ using IPManagement.API.DTOs;
 using IPManagement.API.Models;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.SignalR;
+using IPManagement.API.Hubs;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -23,11 +25,19 @@ namespace IPManagement.API.Services
     {
         private readonly ApplicationDbContext _context;
         private readonly UserManager<ApplicationUser> _userManager;
+        private readonly IHubContext<NotificationHub> _hubContext;
+        private readonly ILogger<UserService> _logger;
 
-        public UserService(ApplicationDbContext context, UserManager<ApplicationUser> userManager)
+        public UserService(
+            ApplicationDbContext context,
+            UserManager<ApplicationUser> userManager,
+            IHubContext<NotificationHub> hubContext,
+            ILogger<UserService> logger)
         {
             _context = context;
             _userManager = userManager;
+            _hubContext = hubContext;
+            _logger = logger;
         }
 
         public async Task<UserListResponse> GetUsersAsync(Guid userId, int pageNumber, int pageSize, long? unitId)
@@ -227,6 +237,7 @@ namespace IPManagement.API.Services
             // Tạo unit assignments
             if (request.UnitAssignments != null && request.UnitAssignments.Length > 0)
             {
+                var assignedUnitIds = new List<long>();
                 foreach (var assignment in request.UnitAssignments)
                 {
                     _context.UserUnitAssignments.Add(new UserUnitAssignment
@@ -236,8 +247,12 @@ namespace IPManagement.API.Services
                         Role = assignment.Role,
                         IsPrimary = assignment.IsPrimary
                     });
+                    assignedUnitIds.Add(assignment.UnitId);
                 }
                 await _context.SaveChangesAsync();
+
+                // Gửi notification đến user được gán
+                await SendUnitAssignmentNotificationAsync(user.Id, assignedUnitIds, "Assigned");
             }
 
             // Load lại unit assignments
@@ -299,6 +314,15 @@ namespace IPManagement.API.Services
             // Cập nhật unit assignments
             if (request.UnitAssignments != null)
             {
+                _logger.LogInformation($"[UPDATE_USER] User '{target.Id}' has {request.UnitAssignments.Length} unit assignments in request");
+
+                // Lưu old unit ids trước khi xóa
+                var oldUnitIds = target.UserUnitAssignments.Select(ua => ua.UnitId).ToList();
+                var newUnitIds = request.UnitAssignments.Select(a => a.UnitId).ToList();
+
+                _logger.LogInformation($"[UPDATE_USER] Old unit IDs: [{string.Join(", ", oldUnitIds)}]");
+                _logger.LogInformation($"[UPDATE_USER] New unit IDs: [{string.Join(", ", newUnitIds)}]");
+
                 // Xóa các assignments cũ
                 _context.UserUnitAssignments.RemoveRange(target.UserUnitAssignments);
 
@@ -314,6 +338,23 @@ namespace IPManagement.API.Services
                     });
                 }
                 await _context.SaveChangesAsync();
+
+                // Gửi notification đến user nếu có thay đổi
+                bool hasUnitChange = oldUnitIds.Count != newUnitIds.Count || oldUnitIds.Any(u => !newUnitIds.Contains(u)) || newUnitIds.Any(u => !oldUnitIds.Contains(u));
+                _logger.LogInformation($"[UPDATE_USER] Has unit change: {hasUnitChange}");
+
+                if (hasUnitChange)
+                {
+                    await SendUnitAssignmentNotificationAsync(target.Id, newUnitIds, "Assigned");
+                }
+                else
+                {
+                    _logger.LogInformation($"[UPDATE_USER] No unit change detected, skipping notification");
+                }
+            }
+            else
+            {
+                _logger.LogInformation($"[UPDATE_USER] request.UnitAssignments is null, skipping unit update");
             }
 
             // Cập nhật roles
@@ -388,6 +429,45 @@ namespace IPManagement.API.Services
         {
             var roles = await _userManager.GetRolesAsync(user);
             return roles.Contains("Admin");
+        }
+
+        /// <summary>
+        /// Gửi notification đến user khi được gán hoặc gỡ khỏi unit
+        /// </summary>
+        private async Task SendUnitAssignmentNotificationAsync(string userId, List<long> unitIds, string action)
+        {
+            try
+            {
+                _logger.LogInformation($"[NOTIFICATION] Preparing to send unit assignment notification - User ID: '{userId}', Action: {action}, Unit IDs: {string.Join(", ", unitIds)}");
+
+                // Gửi notification đến user
+                var notification = new UnitUpdateNotificationDto
+                {
+                    UnitId = unitIds.FirstOrDefault(),
+                    UnitName = null,
+                    Action = action == "Assigned" ? "Updated" : "Deleted",
+                    UpdatedAt = DateTime.UtcNow,
+                    UpdatedBy = null
+                };
+
+                // Gửi đến group của user (thay vì Clients.User)
+                var targetUser = await _userManager.FindByIdAsync(userId);
+                if (targetUser != null)
+                {
+                    var roles = await _userManager.GetRolesAsync(targetUser);
+                    foreach (var role in roles)
+                    {
+                        await _hubContext.Clients.Group($"role:{role}")
+                            .SendAsync("UnitUpdated", notification);
+                    }
+                }
+
+                _logger.LogInformation($"[NOTIFICATION] Successfully sent unit assignment notification to user '{userId}' - Action: {action}");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "[NOTIFICATION] Failed to send unit assignment notification to user '{UserId}'", userId);
+            }
         }
     }
 }
