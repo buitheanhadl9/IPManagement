@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Table, Button, Modal, Form, Input, Select, message, Space, Popconfirm, Tag, Card, Row, Col, Typography } from 'antd';
-import { PlusOutlined, EditOutlined, DeleteOutlined, SearchOutlined, EnvironmentOutlined, CheckCircleOutlined, CloseCircleOutlined } from '@ant-design/icons';
+import { PlusOutlined, EditOutlined, DeleteOutlined, SearchOutlined, EnvironmentOutlined, CheckCircleOutlined, CloseCircleOutlined, WifiOutlined } from '@ant-design/icons';
 import type { Unit, UnitCreateRequest, UnitUpdateRequest } from '../types/unit';
 import { unitService } from '../services/unit.service';
 import { useNavigate } from 'react-router-dom';
@@ -183,10 +183,10 @@ const UnitsPage = () => {
       render: (code: string | undefined) => code || '-',
     },
     {
-      title: 'Đơn vị cấp trên',
-      dataIndex: 'parentUnitName',
-      key: 'parentUnitName',
-      render: (parentName: string | undefined) => parentName || '-',
+      title: 'Địa chỉ',
+      dataIndex: 'address',
+      key: 'address',
+      render: (address: string | undefined) => address || '-',
     },
     {
       title: 'Mô tả',
@@ -223,6 +223,7 @@ const UnitsPage = () => {
               icon={<EditOutlined />}
               onClick={() => handleEdit(record)}
               size="small"
+              type="primary"
             />
           )}
           {canDeleteUnit && (
@@ -282,11 +283,11 @@ const UnitsPage = () => {
 
           <Col span={24}>
             <Space wrap>
-              <a onClick={() => handleViewIPs(unit.id, unit.name)} style={{ fontWeight: 500 }}>
+              <Button icon={<WifiOutlined />} onClick={() => handleViewIPs(unit.id, unit.name)} size="small">
                 View IPs
-              </a>
+              </Button>
               {canUpdateUnit && (
-                <Button icon={<EditOutlined />} onClick={() => handleEdit(unit)} size="small">
+                <Button icon={<EditOutlined />} onClick={() => handleEdit(unit)} size="small" type="primary">
                   Edit
                 </Button>
               )}

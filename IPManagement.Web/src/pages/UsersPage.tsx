@@ -441,7 +441,7 @@ const UsersPage = () => {
   ];
 
   // User Card Component for Mobile View
-  const UserCard = ({ user }: { user: User }) => (
+  const UserCard = ({ user: userData }: { user: User }) => (
     <Card
       size="small"
       style={{ marginBottom: 12 }}
@@ -452,9 +452,9 @@ const UsersPage = () => {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
             <Space>
               <UserOutlined style={{ fontSize: 24, color: '#1890ff' }} />
-              <Title level={5} style={{ margin: 0 }}>{user.username}</Title>
+              <Title level={5} style={{ margin: 0 }}>{userData.username}</Title>
             </Space>
-            <Tag color={user.isActive ? 'green' : 'default'}>{user.isActive ? 'Active' : 'Inactive'}</Tag>
+            <Tag color={userData.isActive ? 'green' : 'default'}>{userData.isActive ? 'Active' : 'Inactive'}</Tag>
           </div>
         </Col>
         
@@ -462,32 +462,32 @@ const UsersPage = () => {
           <Space direction="vertical" style={{ width: '100%' }} size="small">
             <Space>
               <MailOutlined style={{ color: '#666', minWidth: 20 }} />
-              <span>{user.email}</span>
+              <span>{userData.email}</span>
             </Space>
-            {user.phone && (
+            {userData.phone && (
               <Space>
                 <PhoneOutlined style={{ color: '#666', minWidth: 20 }} />
-                <span>{user.phone}</span>
+                <span>{userData.phone}</span>
               </Space>
             )}
-            {user.fullName && (
+            {userData.fullName && (
               <Space>
                 <UserOutlined style={{ color: '#666', minWidth: 20 }} />
-                <span>Full Name: {user.fullName}</span>
+                <span>Full Name: {userData.fullName}</span>
               </Space>
             )}
             <Space>
               <EnvironmentOutlined style={{ color: '#666', minWidth: 20 }} />
-              <span>Primary Unit: {getPrimaryUnitName(user)}</span>
+              <span>Primary Unit: {getPrimaryUnitName(userData)}</span>
             </Space>
             <Space>
               <EnvironmentOutlined style={{ color: '#666', minWidth: 20 }} />
-              <span>All Units: {getAllUnitNames(user)}</span>
+              <span>All Units: {getAllUnitNames(userData)}</span>
             </Space>
             <Space>
               Roles:{' '}
               <Space wrap>
-                {user.roles?.map((role) => (
+                {userData.roles?.map((role) => (
                   <Tag key={role} color={role === 'Admin' ? 'red' : role === 'Manager' ? 'blue' : 'green'}>
                     {role}
                   </Tag>
@@ -496,7 +496,7 @@ const UsersPage = () => {
             </Space>
             <Space>
               <CalendarOutlined style={{ color: '#666', minWidth: 20 }} />
-              <span>Last Login: {user.lastLogin ? format(new Date(user.lastLogin), 'dd/MM/yyyy HH:mm') : 'Never'}</span>
+              <span>Last Login: {userData.lastLogin ? format(new Date(userData.lastLogin), 'dd/MM/yyyy HH:mm') : 'Never'}</span>
             </Space>
           </Space>
         </Col>
@@ -507,7 +507,7 @@ const UsersPage = () => {
             {hasPermission(user, Permissions.USER_UPDATE) && (
               <Button
                 icon={<LockOutlined />}
-                onClick={() => handleResetPassword(user.id)}
+                onClick={() => handleResetPassword(userData.id)}
                 size="small"
                 title="Đổi mật khẩu"
               >
@@ -515,7 +515,7 @@ const UsersPage = () => {
               </Button>
             )}
             {canUpdateUser && (
-              <Button icon={<EditOutlined />} onClick={() => handleEdit(user)} size="small" type="primary">
+              <Button icon={<EditOutlined />} onClick={() => handleEdit(userData)} size="small" type="primary">
                 Edit
               </Button>
             )}
@@ -523,7 +523,7 @@ const UsersPage = () => {
               <Popconfirm
                 title="Delete User"
                 description="Are you sure you want to delete this user?"
-                onConfirm={() => handleDelete(user.id)}
+                onConfirm={() => handleDelete(userData.id)}
                 okText="Yes"
                 cancelText="No"
               >

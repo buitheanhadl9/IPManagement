@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Table, Button, Modal, Form, Input, Select, message, Space, Popconfirm, Card, Row, Col, Typography, Tag, Breadcrumb } from 'antd';
-import { PlusOutlined, EditOutlined, DeleteOutlined, ArrowLeftOutlined } from '@ant-design/icons';
+import { PlusOutlined, EditOutlined, DeleteOutlined, ArrowLeftOutlined, WifiOutlined, BarcodeOutlined, DesktopOutlined, LaptopOutlined } from '@ant-design/icons';
 import type { IPAddress, IPAddressCreateRequest, IPAddressUpdateRequest } from '../types/ip';
 import { ipService } from '../services/ip.service';
 import { unitService } from '../services/unit.service';
@@ -19,6 +19,7 @@ const UnitDetailPage = () => {
   const location = useLocation();
   const unitName = new URLSearchParams(location.search).get('name') || 'Chi tiết đơn vị';
   const user = useAppSelector((state) => state.auth.user);
+  const isAuthenticated = useAppSelector((state) => state.auth.isAuthenticated);
   
   const [ipAddresses, setIPAddresses] = useState<IPAddress[]>([]);
   const [unit, setUnit] = useState<Unit | null>(null);
@@ -26,6 +27,8 @@ const UnitDetailPage = () => {
   const [modalVisible, setModalVisible] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [form] = Form.useForm();
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const [checkingAccess, setCheckingAccess] = useState(true);
 
   // Check permissions - use useMemo to re-calculate when user changes
   const canCreateIP = useMemo(() => hasPermission(user, Permissions.IP_CREATE), [user]);
@@ -33,18 +36,37 @@ const UnitDetailPage = () => {
   const canDeleteIP = useMemo(() => hasPermission(user, Permissions.IP_DELETE), [user]);
   const canReadIP = useMemo(() => hasPermission(user, Permissions.IP_READ), [user]);
 
+  // Handle window resize for responsive design
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   // Kiểm tra quyền truy cập unit - use useMemo to re-calculate when user or id changes
   // User cần có quyền IP_READ và được gán vào đơn vị (hoặc là Admin) mới được truy cập
   const hasUnitAccess = useMemo(() => {
     if (!id) return false;
+    // Nếu chưa có user (đang loading), chưa kiểm tra
+    if (!user || !isAuthenticated) return null;
     // Admin có thể truy cập mọi đơn vị
     if (isAdmin(user)) return true;
     // User thường cần có quyền IP_READ VÀ được gán vào đơn vị
     return canReadIP && isAssignedToUnit(user, parseInt(id));
-  }, [user, id, canReadIP]);
+  }, [user, id, canReadIP, isAuthenticated]);
   
   useEffect(() => {
-    if (id) {
+    // Đợi user được load xong trước khi kiểm tra quyền
+    if (!isAuthenticated) {
+      // Chưa đăng nhập, chưa kiểm tra
+      setCheckingAccess(true);
+      return;
+    }
+    
+    if (id && hasUnitAccess !== null) {
+      setCheckingAccess(false);
       // Kiểm tra quyền truy cập trước khi fetch dữ liệu
       if (!hasUnitAccess && !isAdmin(user)) {
         message.error('Bạn không có quyền truy cập đơn vị này');
@@ -84,7 +106,7 @@ const UnitDetailPage = () => {
       unsubscribeUnit();
       unsubscribePermissions();
     };
-  }, [id, hasUnitAccess]);
+  }, [id, hasUnitAccess, isAuthenticated]);
 
   const fetchUnit = async () => {
     if (!id) return;
@@ -253,19 +275,19 @@ const UnitDetailPage = () => {
       ),
     },
     {
-      title: 'Thao tác',
+      title: 'Actions',
       key: 'actions',
       align: 'center' as const,
       width: 100,
       render: (_: unknown, record: IPAddress) => (
         <Space>
           {canUpdateIP && (
-            <Button icon={<EditOutlined />} onClick={() => handleEdit(record)} size="small" />
+            <Button icon={<EditOutlined />} onClick={() => handleEdit(record)} size="small" type="primary" />
           )}
           {canDeleteIP && (
             <Popconfirm
-              title="Xóa IP Address"
-              description="Bạn có chắc muốn xóa IP này?"
+              title="Delete IP Address"
+              description="Are you sure you want to delete this IP?"
               onConfirm={() => handleDelete(record.id)}
               okText="Yes"
               cancelText="No"
@@ -277,6 +299,84 @@ const UnitDetailPage = () => {
       ),
     },
   ];
+
+  // IPCard Component for Mobile View
+  const IPCard = ({ ip }: { ip: IPAddress }) => {
+    const statusColor = ip.status === 'Active' ? 'green' : ip.status === 'Reserved' ? 'orange' : 'red';
+    const deviceTypeColor = ip.deviceType === 'PC' ? 'blue' : ip.deviceType === 'Printer' ? 'green' : ip.deviceType === 'Server' ? 'red' : 'default';
+    
+    return (
+      <Card size="small" style={{ marginBottom: 12 }} className="ip-mobile-card">
+        <Row gutter={[16, 8]}>
+          <Col span={24}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <Space>
+                <WifiOutlined style={{ fontSize: 24, color: '#1890ff' }} />
+                <span style={{ fontSize: 16, fontWeight: 600 }}>{ip.ipAddress}</span>
+              </Space>
+              <Tag color={statusColor}>{ip.status}</Tag>
+            </div>
+          </Col>
+          
+          <Col span={24}>
+            <Space direction="vertical" style={{ width: '100%' }} size="small">
+              <Space>
+                <strong>MAC:</strong> <span>{ip.macAddress || '-'}</span>
+              </Space>
+              <Space>
+                <strong>Device:</strong> <span>{ip.deviceName || '-'}</span>
+              </Space>
+              <Space>
+                <strong>Type:</strong> <Tag color={deviceTypeColor}>{ip.deviceType || '-'}</Tag>
+              </Space>
+              <Space>
+                <strong>Port:</strong> <span>{ip.port || '-'}</span>
+              </Space>
+              {ip.description && (
+                <Space>
+                  <strong>Note:</strong> <span style={{ color: '#666' }}>{ip.description}</span>
+                </Space>
+              )}
+            </Space>
+          </Col>
+          
+          <Col span={24}>
+            <Space wrap>
+              {canUpdateIP && (
+                <Button icon={<EditOutlined />} onClick={() => handleEdit(ip)} size="small" type="primary">
+                  Edit
+                </Button>
+              )}
+              {canDeleteIP && (
+                <Popconfirm
+                  title="Delete IP Address"
+                  description="Are you sure you want to delete this IP?"
+                  onConfirm={() => handleDelete(ip.id)}
+                  okText="Yes"
+                  cancelText="No"
+                >
+                  <Button icon={<DeleteOutlined />} danger size="small">
+                    Delete
+                  </Button>
+                </Popconfirm>
+              )}
+            </Space>
+          </Col>
+        </Row>
+      </Card>
+    );
+  };
+
+  // Đang kiểm tra quyền truy cập (chờ user được load)
+  if (checkingAccess || hasUnitAccess === null) {
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh' }}>
+        <Card>
+          <Title level={4}>Đang kiểm tra quyền...</Title>
+        </Card>
+      </div>
+    );
+  }
 
   // Nếu không có quyền truy cập, hiển thị thông báo lỗi
   if (!hasUnitAccess && !isAdmin(user)) {
@@ -342,15 +442,31 @@ const UnitDetailPage = () => {
           </Col>
         </Row>
 
-        <Table
-          columns={columns}
-          dataSource={ipAddresses}
-          rowKey="id"
-          loading={loading}
-          pagination={{ pageSize: 10, showSizeChanger: true }}
-          scroll={{ x: 1000 }}
-          size="small"
-        />
+        {isMobile ? (
+          <div style={{ marginTop: 16 }}>
+            {ipAddresses.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: 40, color: '#999' }}>
+                Không có IP address nào
+              </div>
+            ) : (
+              <>
+                {ipAddresses.map((ipItem) => (
+                  <IPCard key={ipItem.id} ip={ipItem} />
+                ))}
+              </>
+            )}
+          </div>
+        ) : (
+          <Table
+            columns={columns}
+            dataSource={ipAddresses}
+            rowKey="id"
+            loading={loading}
+            pagination={{ pageSize: 10, showSizeChanger: true }}
+            scroll={{ x: 1000 }}
+            size="small"
+          />
+        )}
       </Card>
 
       <Modal
