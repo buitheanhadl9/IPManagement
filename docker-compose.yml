@@ -1,0 +1,80 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: ipmanagement-postgres
+    environment:
+      POSTGRES_DB: IPManagementDB
+      POSTGRES_USER: ipmanagement
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - ipmanagement-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ipmanagement -d IPManagementDB"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Backend API
+  api:
+    build:
+      context: .
+      dockerfile: IPManagement.API/Dockerfile
+    container_name: ipmanagement-api
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__DefaultConnection: "Host=postgres:5432;Database=IPManagementDB;Username=ipmanagement;Password=${DB_PASSWORD}"
+      JwtSettings__SecretKey: ${JWT_SECRET_KEY:?JWT_SECRET_KEY is required}
+      JwtSettings__Issuer: IPManagementAPI
+      JwtSettings__Audience: IPManagementClient
+      JwtSettings__AccessTokenExpirationMinutes: 60
+      JwtSettings__RefreshTokenExpirationDays: 7
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - ipmanagement-network
+    restart: unless-stopped
+
+  # Frontend
+  frontend:
+    build:
+      context: ./IPManagement.Web
+      dockerfile: Dockerfile
+    container_name: ipmanagement-frontend
+    depends_on:
+      - api
+    networks:
+      - ipmanagement-network
+    restart: unless-stopped
+
+  # Nginx Reverse Proxy
+  nginx:
+    image: nginx:alpine
+    container_name: ipmanagement-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./nginx/ssl:/etc/ssl:ro
+    depends_on:
+      - frontend
+      - api
+    networks:
+      - ipmanagement-network
+    restart: unless-stopped
+
+networks:
+  ipmanagement-network:
+    driver: bridge
+
+volumes:
+  postgres_data:

@@ -1,6 +1,7 @@
 using IPManagement.API.Data;
 using IPManagement.API.DTOs;
 using IPManagement.API.Models;
+using IPManagement.API.Extensions;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using System;
