@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Table, Button, Modal, Form, Input, Select, message, Space, Popconfirm, Row, Col, Card } from 'antd';
-import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
+import { Table, Button, Modal, Form, Input, Select, message, Space, Popconfirm, Row, Col, Card, Divider, Tag } from 'antd';
+import { PlusOutlined, EditOutlined, DeleteOutlined, WifiOutlined, BarcodeOutlined, DesktopOutlined, EnvironmentOutlined, CheckCircleOutlined, CloseCircleOutlined, LaptopOutlined } from '@ant-design/icons';
 import type { IPAddress, IPAddressCreateRequest, IPAddressUpdateRequest } from '../types/ip';
 import { ipService } from '../services/ip.service';
 import { unitService } from '../services/unit.service';
@@ -13,13 +13,20 @@ import type { PermissionUpdateNotification } from '../types/notification';
 
 const IPListPage = () => {
   const user = useAppSelector((state) => state.auth.user);
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
   
   // Debug: Log user info
   useEffect(() => {
     console.log('=== IPListPage User Info ===');
     console.log('User:', user);
     console.log('User roles:', user?.roles);
+    console.log('Initial isMobile:', window.innerWidth < 768, 'Window width:', window.innerWidth);
   }, [user]);
+  
+  // Debug log for isMobile
+  useEffect(() => {
+    console.log('isMobile changed to:', isMobile, 'Window width:', window.innerWidth);
+  }, [isMobile]);
   const [ipAddresses, setIPAddresses] = useState<IPAddress[]>([]);
   const [units, setUnits] = useState<Unit[]>([]);
   const [loading, setLoading] = useState(false);
@@ -35,11 +42,27 @@ const IPListPage = () => {
   const canUpdateIP = useMemo(() => hasPermission(user, Permissions.IP_UPDATE), [user]);
   const canDeleteIP = useMemo(() => hasPermission(user, Permissions.IP_DELETE), [user]);
 
+  // Handle window resize for responsive design
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   // Không fetch dữ liệu nếu không có quyền IP_READ
   useEffect(() => {
-    if (!canReadIP) {
+    console.log('=== IPListPage useEffect ===');
+    console.log('user:', user);
+    console.log('canReadIP:', canReadIP);
+    console.log('selectedUnitId:', selectedUnitId);
+    
+    if (!user || !canReadIP) {
+      console.log('Skipping fetch - no user or no permission');
       return;
     }
+    console.log('Fetching IP addresses...');
     fetchIPAddresses();
     fetchUnits();
 
@@ -52,7 +75,7 @@ const IPListPage = () => {
     return () => {
       unsubscribePermissions();
     };
-  }, [selectedUnitId]);
+  }, [selectedUnitId, canReadIP, user]);
 
   const fetchUnits = async () => {
     try {
@@ -64,11 +87,16 @@ const IPListPage = () => {
   };
 
   const fetchIPAddresses = async () => {
+    console.log('=== fetchIPAddresses ===');
     setLoading(true);
     try {
+      console.log('Calling API with selectedUnitId:', selectedUnitId);
       const response = await ipService.getIPAddresses(1, 100, undefined, selectedUnitId || undefined);
+      console.log('API response:', response);
       setIPAddresses(response.items);
-    } catch {
+      console.log('Set IP addresses, count:', response.items?.length);
+    } catch (error) {
+      console.error('Failed to fetch IP addresses:', error);
       message.error('Failed to fetch IP addresses');
     } finally {
       setLoading(false);
@@ -223,6 +251,83 @@ const IPListPage = () => {
     },
   ];
 
+  // IPCard Component for Mobile View
+  const IPCard = ({ ip }: { ip: IPAddress }) => {
+    const statusColor = ip.status === 'Active' ? 'green' : ip.status === 'Inactive' ? 'default' : 'orange';
+    const deviceTypeColor = ip.deviceType === 'PC' ? 'blue' : ip.deviceType === 'Printer' ? 'green' : ip.deviceType === 'Server' ? 'red' : 'default';
+    
+    return (
+      <Card size="small" style={{ marginBottom: 12 }} className="ip-mobile-card">
+        <Row gutter={[16, 8]}>
+          <Col span={24}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <Space>
+                <WifiOutlined style={{ fontSize: 24, color: '#1890ff' }} />
+                <span style={{ fontSize: 16, fontWeight: 600 }}>{ip.ipAddress}</span>
+              </Space>
+              <Tag color={statusColor}>{ip.status}</Tag>
+            </div>
+          </Col>
+          
+          <Col span={24}>
+            <Space direction="vertical" style={{ width: '100%' }} size="small">
+              <Space>
+                <BarcodeOutlined style={{ color: '#666', minWidth: 20 }} />
+                <span>MAC: {ip.macAddress || '-'}</span>
+              </Space>
+              <Space>
+                <DesktopOutlined style={{ color: '#666', minWidth: 20 }} />
+                <span>Device: {ip.deviceName || '-'}</span>
+              </Space>
+              <Space>
+                <LaptopOutlined style={{ color: '#666', minWidth: 20 }} />
+                <span>Type: {ip.deviceType ? <Tag color={deviceTypeColor}>{ip.deviceType}</Tag> : '-'}</span>
+              </Space>
+              <Space>
+                <EnvironmentOutlined style={{ color: '#666', minWidth: 20 }} />
+                <span>Unit: {ip.unitName || '-'}</span>
+              </Space>
+              {ip.port && (
+                <Space>
+                  <span>Port: {ip.port}</span>
+                </Space>
+              )}
+              {ip.description && (
+                <Space>
+                  <span style={{ color: '#666' }}>Note: {ip.description}</span>
+                </Space>
+              )}
+            </Space>
+          </Col>
+          
+          <Col span={24}>
+            <Divider style={{ margin: '8px 0' }} />
+            <Space>
+              {canUpdateIP && (
+                <Button icon={<EditOutlined />} onClick={() => handleEdit(ip)} size="small" type="primary">
+                  Edit
+                </Button>
+              )}
+              {canDeleteIP && (
+                <Popconfirm
+                  title="Delete IP Address"
+                  description="Are you sure to delete this IP address?"
+                  onConfirm={() => handleDelete(ip.id)}
+                  okText="Yes"
+                  cancelText="No"
+                >
+                  <Button icon={<DeleteOutlined />} danger size="small">
+                    Delete
+                  </Button>
+                </Popconfirm>
+              )}
+            </Space>
+          </Col>
+        </Row>
+      </Card>
+    );
+  };
+
   // Nếu không có quyền IP_READ, hiển thị thông báo
   if (!canReadIP) {
     return (
@@ -269,15 +374,38 @@ const IPListPage = () => {
               </div>
             </div>
 
-            <Table
-              columns={columns}
-              dataSource={ipAddresses}
-              rowKey="id"
-              loading={loading}
-              pagination={{ pageSize: 10, showSizeChanger: true }}
-              scroll={{ x: 800 }}
-              size="small"
-            />
+            {/* Debug: Show current mode */}
+            <div style={{ marginBottom: 8, fontSize: 12, color: '#666' }}>
+              Current view: {isMobile ? 'Mobile (Card)' : 'Desktop (Table)'} | Window width: {typeof window !== 'undefined' ? window.innerWidth : 'N/A'}px
+            </div>
+
+            {/* Mobile View - Card Layout */}
+            {isMobile ? (
+              <div style={{ marginTop: 16 }}>
+                {ipAddresses.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: 40, color: '#999' }}>
+                    Không có IP address nào
+                  </div>
+                ) : (
+                  <>
+                    {ipAddresses.map((ipItem) => (
+                      <IPCard key={ipItem.id} ip={ipItem} />
+                    ))}
+                  </>
+                )}
+              </div>
+            ) : (
+              /* Desktop View - Table Layout */
+              <Table
+                columns={columns}
+                dataSource={ipAddresses}
+                rowKey="id"
+                loading={loading}
+                pagination={{ pageSize: 10, showSizeChanger: true }}
+                scroll={{ x: 800 }}
+                size="small"
+              />
+            )}
           </Card>
         </Col>
       </Row>

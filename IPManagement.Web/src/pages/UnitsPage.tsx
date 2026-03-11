@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Table, Button, Modal, Form, Input, Select, message, Space, Popconfirm, Tag, Card, Row, Col, Typography } from 'antd';
-import { PlusOutlined, EditOutlined, DeleteOutlined, SearchOutlined } from '@ant-design/icons';
+import { PlusOutlined, EditOutlined, DeleteOutlined, SearchOutlined, EnvironmentOutlined, CheckCircleOutlined, CloseCircleOutlined } from '@ant-design/icons';
 import type { Unit, UnitCreateRequest, UnitUpdateRequest } from '../types/unit';
 import { unitService } from '../services/unit.service';
 import { useNavigate } from 'react-router-dom';
@@ -21,12 +21,22 @@ const UnitsPage = () => {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [form] = Form.useForm();
   const [searchTerm, setSearchTerm] = useState('');
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const navigate = useNavigate();
 
   // Check permissions based on user permissions - use useMemo to re-calculate when user changes
   const canCreateUnit = useMemo(() => hasPermission(user, Permissions.UNIT_CREATE), [user]);
   const canUpdateUnit = useMemo(() => hasPermission(user, Permissions.UNIT_UPDATE), [user]);
   const canDeleteUnit = useMemo(() => hasPermission(user, Permissions.UNIT_DELETE), [user]);
+
+  // Handle window resize for responsive design
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   useEffect(() => {
     fetchUnits();
@@ -202,7 +212,7 @@ const UnitsPage = () => {
       ),
     },
     {
-      title: 'Thao tác',
+      title: 'Actions',
       key: 'actions',
       align: 'center' as const,
       width: 150,
@@ -217,8 +227,8 @@ const UnitsPage = () => {
           )}
           {canDeleteUnit && (
             <Popconfirm
-              title="Xóa đơn vị"
-              description="Bạn có chắc muốn xóa đơn vị này?"
+              title="Delete Unit"
+              description="Are you sure you want to delete this unit?"
               onConfirm={() => handleDelete(record.id)}
               okText="Yes"
               cancelText="No"
@@ -230,6 +240,75 @@ const UnitsPage = () => {
       ),
     },
   ];
+
+  // UnitCard Component for Mobile View
+  const UnitCard = ({ unit }: { unit: Unit }) => {
+    return (
+      <Card size="small" style={{ marginBottom: 12 }} className="unit-mobile-card">
+        <Row gutter={[16, 8]}>
+          <Col span={24}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <Space>
+                <EnvironmentOutlined style={{ fontSize: 24, color: '#1890ff' }} />
+                <span style={{ fontSize: 16, fontWeight: 600 }}>{unit.name}</span>
+              </Space>
+              <Tag color={unit.isActive ? 'green' : 'default'}>{unit.isActive ? 'Hoạt động' : 'Không hoạt động'}</Tag>
+            </div>
+          </Col>
+
+          <Col span={24}>
+            <Space direction="vertical" style={{ width: '100%' }} size="small">
+              <Space>
+                <strong>Mã:</strong> <span>{unit.code || '-'}</span>
+              </Space>
+              <Space>
+                <strong>Đơn vị cấp trên:</strong> <span>{unit.parentUnitName || 'Root'}</span>
+              </Space>
+              {unit.address && (
+                <Space>
+                  <strong>Địa chỉ:</strong> <span>{unit.address}</span>
+                </Space>
+              )}
+              <Space>
+                <strong>Số IP:</strong> <Tag color="blue">{unit.ipAddressCount || 0}</Tag>
+              </Space>
+              {unit.description && (
+                <Space>
+                  <strong>Mô tả:</strong> <span style={{ color: '#666' }}>{unit.description}</span>
+                </Space>
+              )}
+            </Space>
+          </Col>
+
+          <Col span={24}>
+            <Space wrap>
+              <a onClick={() => handleViewIPs(unit.id, unit.name)} style={{ fontWeight: 500 }}>
+                View IPs
+              </a>
+              {canUpdateUnit && (
+                <Button icon={<EditOutlined />} onClick={() => handleEdit(unit)} size="small">
+                  Edit
+                </Button>
+              )}
+              {canDeleteUnit && (
+                <Popconfirm
+                  title="Delete Unit"
+                  description="Are you sure you want to delete this unit?"
+                  onConfirm={() => handleDelete(unit.id)}
+                  okText="Yes"
+                  cancelText="No"
+                >
+                  <Button icon={<DeleteOutlined />} danger size="small">
+                    Delete
+                  </Button>
+                </Popconfirm>
+              )}
+            </Space>
+          </Col>
+        </Row>
+      </Card>
+    );
+  };
 
   return (
     <div>
@@ -257,15 +336,31 @@ const UnitsPage = () => {
           </Col>
         </Row>
 
-        <Table
-          columns={columns}
-          dataSource={filteredUnits}
-          rowKey="id"
-          loading={loading}
-          pagination={{ pageSize: 50, showSizeChanger: true, showQuickJumper: true }}
-          scroll={{ x: 900 }}
-          size="small"
-        />
+        {isMobile ? (
+          <div style={{ marginTop: 16 }}>
+            {filteredUnits.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: 40, color: '#999' }}>
+                Không có đơn vị nào
+              </div>
+            ) : (
+              <>
+                {filteredUnits.map((unitItem) => (
+                  <UnitCard key={unitItem.id} unit={unitItem} />
+                ))}
+              </>
+            )}
+          </div>
+        ) : (
+          <Table
+            columns={columns}
+            dataSource={filteredUnits}
+            rowKey="id"
+            loading={loading}
+            pagination={{ pageSize: 50, showSizeChanger: true, showQuickJumper: true }}
+            scroll={{ x: 900 }}
+            size="small"
+          />
+        )}
       </Card>
 
       <Modal

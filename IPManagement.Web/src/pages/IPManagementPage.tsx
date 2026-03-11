@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Table, Button, Input, Space, Tag, message, Card, Breadcrumb, Typography, Popconfirm, Select, Modal, Form } from 'antd';
-import { PlusOutlined, EditOutlined, DeleteOutlined, SearchOutlined, ReloadOutlined } from '@ant-design/icons';
+import { Table, Button, Input, Space, Tag, message, Card, Breadcrumb, Typography, Popconfirm, Select, Modal, Form, Divider, Row, Col } from 'antd';
+import { PlusOutlined, EditOutlined, DeleteOutlined, SearchOutlined, ReloadOutlined, WifiOutlined, BarcodeOutlined, DesktopOutlined, EnvironmentOutlined, CheckCircleOutlined, CloseCircleOutlined, LaptopOutlined } from '@ant-design/icons';
 import type { IPAddress, IPAddressCreateRequest, IPAddressUpdateRequest } from '../types/ip';
 import { ipService } from '../services/ip.service';
 import { unitService } from '../services/unit.service';
@@ -14,6 +14,7 @@ const { Search } = Input;
 
 const IPManagementPage = () => {
   const user = useAppSelector((state) => state.auth.user);
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   
   const [ipAddresses, setIPAddresses] = useState<IPAddress[]>([]);
   const [loading, setLoading] = useState(false);
@@ -31,6 +32,15 @@ const IPManagementPage = () => {
   const canUpdateIP = hasPermission(user, Permissions.IP_UPDATE);
   const canDeleteIP = hasPermission(user, Permissions.IP_DELETE);
 
+  // Handle window resize for responsive design
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   // Không fetch dữ liệu nếu không có quyền IP_READ
   useEffect(() => {
     if (!canReadIP) {
@@ -38,17 +48,14 @@ const IPManagementPage = () => {
     }
     fetchIPAddresses();
     fetchUnits();
-  }, [searchTerm, statusFilter, unitIdFilter]);
+  }, [searchTerm, statusFilter, unitIdFilter, canReadIP]);
 
   const fetchIPAddresses = async () => {
-    console.log('[IPManagementPage] fetchIPAddresses called with:', { searchTerm, unitIdFilter, statusFilter });
     setLoading(true);
     try {
       const response = await ipService.getIPAddresses(1, 100, searchTerm || undefined, unitIdFilter || undefined, statusFilter || undefined);
-      console.log('[IPManagementPage] fetchIPAddresses response:', response.items.length, 'items');
       setIPAddresses(response.items);
     } catch (error: any) {
-      console.error('[IPManagementPage] fetchIPAddresses error:', error);
       message.error('Failed to fetch IP addresses: ' + (error?.response?.data?.message || error?.message));
     } finally {
       setLoading(false);
@@ -228,6 +235,83 @@ const IPManagementPage = () => {
     },
   ];
 
+  // IPCard Component for Mobile View
+  const IPCard = ({ ip }: { ip: IPAddress }) => {
+    const statusColor = ip.status === 'Active' ? 'green' : ip.status === 'Reserved' ? 'orange' : 'red';
+    const deviceTypeColor = ip.deviceType === 'PC' ? 'blue' : ip.deviceType === 'Printer' ? 'green' : ip.deviceType === 'Server' ? 'red' : 'default';
+    
+    return (
+      <Card size="small" style={{ marginBottom: 12 }} className="ip-mobile-card">
+        <Row gutter={[16, 8]}>
+          <Col span={24}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <Space>
+                <WifiOutlined style={{ fontSize: 24, color: '#1890ff' }} />
+                <span style={{ fontSize: 16, fontWeight: 600 }}>{ip.ipAddress}</span>
+              </Space>
+              <Tag color={statusColor}>{ip.status}</Tag>
+            </div>
+          </Col>
+          
+          <Col span={24}>
+            <Space direction="vertical" style={{ width: '100%' }} size="small">
+              <Space>
+                <BarcodeOutlined style={{ color: '#666', minWidth: 20 }} />
+                <span>MAC: {ip.macAddress || '-'}</span>
+              </Space>
+              <Space>
+                <DesktopOutlined style={{ color: '#666', minWidth: 20 }} />
+                <span>Device: {ip.deviceName || '-'}</span>
+              </Space>
+              <Space>
+                <LaptopOutlined style={{ color: '#666', minWidth: 20 }} />
+                <span>Type: {ip.deviceType ? <Tag color={deviceTypeColor}>{ip.deviceType}</Tag> : '-'}</span>
+              </Space>
+              <Space>
+                <EnvironmentOutlined style={{ color: '#666', minWidth: 20 }} />
+                <span>Unit: {ip.unitName || '-'}</span>
+              </Space>
+              {ip.port && (
+                <Space>
+                  <span>Port: {ip.port}</span>
+                </Space>
+              )}
+              {ip.description && (
+                <Space>
+                  <span style={{ color: '#666' }}>Note: {ip.description}</span>
+                </Space>
+              )}
+            </Space>
+          </Col>
+          
+          <Col span={24}>
+            <Divider style={{ margin: '8px 0' }} />
+            <Space>
+              {canUpdateIP && (
+                <Button icon={<EditOutlined />} onClick={() => handleEdit(ip)} size="small" type="primary">
+                  Edit
+                </Button>
+              )}
+              {canDeleteIP && (
+                <Popconfirm
+                  title="Xóa IP Address"
+                  description="Bạn có chắc muốn xóa IP này?"
+                  onConfirm={() => handleDelete(ip.id)}
+                  okText="Yes"
+                  cancelText="No"
+                >
+                  <Button icon={<DeleteOutlined />} danger size="small">
+                    Delete
+                  </Button>
+                </Popconfirm>
+              )}
+            </Space>
+          </Col>
+        </Row>
+      </Card>
+    );
+  };
+
   // Nếu không có quyền IP_READ, hiển thị thông báo
   if (!canReadIP) {
     return (
@@ -294,24 +378,44 @@ const IPManagementPage = () => {
             </Button>
           </Space>
 
-          <Table
-            columns={columns}
-            dataSource={ipAddresses}
-            rowKey="id"
-            loading={loading}
-            pagination={{ pageSize: 10 }}
-            scroll={{ x: 1200 }}
-            footer={() => (
-              <Space style={{ justifyContent: 'space-between' }}>
-                <span>Tổng số: {ipAddresses.length} IP addresses</span>
-                {canCreateIP && (
-                  <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
-                    Thêm IP Address
-                  </Button>
-                )}
-              </Space>
-            )}
-          />
+
+
+          {/* Mobile View - Card Layout */}
+          {isMobile ? (
+            <div style={{ marginTop: 16 }}>
+              {ipAddresses.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: 40, color: '#999' }}>
+                  Không có IP address nào
+                </div>
+              ) : (
+                <>
+                  {ipAddresses.map((ipItem) => (
+                    <IPCard key={ipItem.id} ip={ipItem} />
+                  ))}
+                </>
+              )}
+            </div>
+          ) : (
+            /* Desktop View - Table Layout */
+            <Table
+              columns={columns}
+              dataSource={ipAddresses}
+              rowKey="id"
+              loading={loading}
+              pagination={{ pageSize: 10 }}
+              scroll={{ x: 1200 }}
+              footer={() => (
+                <Space style={{ justifyContent: 'space-between' }}>
+                  <span>Tổng số: {ipAddresses.length} IP addresses</span>
+                  {canCreateIP && (
+                    <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
+                      Thêm IP Address
+                    </Button>
+                  )}
+                </Space>
+              )}
+            />
+          )}
         </Space>
       </Card>
 

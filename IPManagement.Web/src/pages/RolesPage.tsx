@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Table, Button, Modal, Form, Input, message, Space, Tag, Card, Row, Col, Typography, Breadcrumb, Popconfirm, Checkbox, Divider } from 'antd';
-import { PlusOutlined, EditOutlined, DeleteOutlined, UserOutlined, KeyOutlined } from '@ant-design/icons';
+import { Table, Button, Modal, Form, Input, message, Space, Tag, Card, Row, Col, Typography, Breadcrumb, Popconfirm, Checkbox, Divider, Pagination } from 'antd';
+import { PlusOutlined, EditOutlined, DeleteOutlined, UserOutlined, KeyOutlined, FileTextOutlined } from '@ant-design/icons';
 import { roleService } from '../services/role.service';
 import { permissionService } from '../services/permission.service';
 import type { Role, CreateRoleRequest } from '../types/role';
@@ -58,6 +58,7 @@ const PERMISSION_CATEGORIES = {
 const RolesPage = () => {
   const user = useAppSelector((state) => state.auth.user);
   const [roles, setRoles] = useState<Role[]>([]);
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [loading, setLoading] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
   const [permissionsModalVisible, setPermissionsModalVisible] = useState(false);
@@ -81,6 +82,15 @@ const RolesPage = () => {
       fetchRoles();
     }
   }, [user, hasAccess]);
+
+  // Handle window resize for responsive design
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // Nếu chưa có user hoặc không có quyền, hiển thị thông báo
   if (!user || !hasAccess) {
@@ -291,6 +301,75 @@ const RolesPage = () => {
     },
   ];
 
+  // Role Card Component for Mobile View
+  const RoleCard = ({ role }: { role: Role }) => (
+    <Card
+      size="small"
+      style={{ marginBottom: 12 }}
+      className="role-mobile-card"
+    >
+      <Row gutter={[16, 8]}>
+        <Col span={24}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+            <Space>
+              <UserOutlined style={{ fontSize: 24, color: role.name === 'Admin' ? '#ff4d4f' : role.name === 'Manager' ? '#1890ff' : '#52c41a' }} />
+              <Title level={5} style={{ margin: 0 }}>{role.name}</Title>
+            </Space>
+            <Tag color={role.name === 'Admin' ? 'red' : role.name === 'Manager' ? 'blue' : 'green'}>{role.name}</Tag>
+          </div>
+        </Col>
+        
+        <Col span={24}>
+          <Space direction="vertical" style={{ width: '100%' }} size="small">
+            {role.description && (
+              <Space>
+                <FileTextOutlined style={{ color: '#666', minWidth: 20 }} />
+                <span>{role.description}</span>
+              </Space>
+            )}
+            <Space>
+              <UserOutlined style={{ color: '#666', minWidth: 20 }} />
+              <span>User Count: {role.userCount}</span>
+            </Space>
+          </Space>
+        </Col>
+        
+        <Col span={24}>
+          <Divider style={{ margin: '8px 0' }} />
+          <Space>
+            {canManagePermissions && (
+              <Button 
+                icon={<KeyOutlined />} 
+                onClick={() => handleManagePermissions(role)} 
+                size="small"
+              >
+                Permissions
+              </Button>
+            )}
+            {canUpdateRole && (
+              <Button icon={<EditOutlined />} onClick={() => handleEdit(role)} size="small" type="primary">
+                Edit
+              </Button>
+            )}
+            {canDeleteRole && !['Admin', 'Manager', 'User'].includes(role.name) && (
+              <Popconfirm
+                title="Delete Role"
+                description="Are you sure you want to delete this role?"
+                onConfirm={() => handleDelete(role.id, role.name)}
+                okText="Yes"
+                cancelText="No"
+              >
+                <Button icon={<DeleteOutlined />} danger size="small">
+                  Delete
+                </Button>
+              </Popconfirm>
+            )}
+          </Space>
+        </Col>
+      </Row>
+    </Card>
+  );
+
   return (
     <div>
       <Breadcrumb
@@ -317,14 +396,32 @@ const RolesPage = () => {
           </Col>
         </Row>
 
-        <Table
-          columns={columns}
-          dataSource={roles}
-          rowKey="id"
-          loading={loading}
-          pagination={false}
-          scroll={{ x: 900 }}
-        />
+        {/* Mobile View - Card Layout */}
+        {isMobile ? (
+          <div style={{ marginTop: 16 }}>
+            {roles.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: 40, color: '#999' }}>
+                Không có role nào
+              </div>
+            ) : (
+              <>
+                {roles.map((roleItem) => (
+                  <RoleCard key={roleItem.id} role={roleItem} />
+                ))}
+              </>
+            )}
+          </div>
+        ) : (
+          /* Desktop View - Table Layout */
+          <Table
+            columns={columns}
+            dataSource={roles}
+            rowKey="id"
+            loading={loading}
+            pagination={false}
+            scroll={{ x: 900 }}
+          />
+        )}
       </Card>
 
       {/* Add/Edit Role Modal */}

@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Table, Button, Modal, Form, Input, Select, message, Space, Popconfirm, Tag, Card, Row, Col, Typography, Breadcrumb, Checkbox, Switch } from 'antd';
-import { PlusOutlined, EditOutlined, SearchOutlined, ReloadOutlined, PlusCircleOutlined, DeleteOutlined as DeleteCircleOutlined, LockOutlined } from '@ant-design/icons';
+import { Table, Button, Modal, Form, Input, Select, message, Space, Popconfirm, Tag, Card, Row, Col, Typography, Breadcrumb, Checkbox, Switch, Divider, Pagination } from 'antd';
+import { PlusOutlined, EditOutlined, SearchOutlined, ReloadOutlined, PlusCircleOutlined, DeleteOutlined as DeleteCircleOutlined, LockOutlined, UserOutlined, MailOutlined, PhoneOutlined, EnvironmentOutlined, CalendarOutlined } from '@ant-design/icons';
 import type { User, UserCreateRequest, UserUpdateRequest, UserUnitAssignmentRequest } from '../types/user';
 import { userService } from '../services/user.service';
 import { unitService } from '../services/unit.service';
@@ -24,6 +24,7 @@ interface UnitAssignmentForm {
 const UsersPage = () => {
   const user = useAppSelector((state) => state.auth.user);
   const [users, setUsers] = useState<User[]>([]);
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [units, setUnits] = useState<{ id: number; name: string }[]>([]);
   const [systemRoles, setSystemRoles] = useState<Role[]>([]);
   const [loading, setLoading] = useState(false);
@@ -73,6 +74,15 @@ const UsersPage = () => {
       unsubscribeUnit();
       unsubscribePermissions();
     };
+  }, []);
+
+  // Handle window resize for responsive design
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
   }, []);
 
   const fetchSystemRoles = async () => {
@@ -430,6 +440,104 @@ const UsersPage = () => {
     },
   ];
 
+  // User Card Component for Mobile View
+  const UserCard = ({ user }: { user: User }) => (
+    <Card
+      size="small"
+      style={{ marginBottom: 12 }}
+      className="user-mobile-card"
+    >
+      <Row gutter={[16, 8]}>
+        <Col span={24}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+            <Space>
+              <UserOutlined style={{ fontSize: 24, color: '#1890ff' }} />
+              <Title level={5} style={{ margin: 0 }}>{user.username}</Title>
+            </Space>
+            <Tag color={user.isActive ? 'green' : 'default'}>{user.isActive ? 'Active' : 'Inactive'}</Tag>
+          </div>
+        </Col>
+        
+        <Col span={24}>
+          <Space direction="vertical" style={{ width: '100%' }} size="small">
+            <Space>
+              <MailOutlined style={{ color: '#666', minWidth: 20 }} />
+              <span>{user.email}</span>
+            </Space>
+            {user.phone && (
+              <Space>
+                <PhoneOutlined style={{ color: '#666', minWidth: 20 }} />
+                <span>{user.phone}</span>
+              </Space>
+            )}
+            {user.fullName && (
+              <Space>
+                <UserOutlined style={{ color: '#666', minWidth: 20 }} />
+                <span>Full Name: {user.fullName}</span>
+              </Space>
+            )}
+            <Space>
+              <EnvironmentOutlined style={{ color: '#666', minWidth: 20 }} />
+              <span>Primary Unit: {getPrimaryUnitName(user)}</span>
+            </Space>
+            <Space>
+              <EnvironmentOutlined style={{ color: '#666', minWidth: 20 }} />
+              <span>All Units: {getAllUnitNames(user)}</span>
+            </Space>
+            <Space>
+              Roles:{' '}
+              <Space wrap>
+                {user.roles?.map((role) => (
+                  <Tag key={role} color={role === 'Admin' ? 'red' : role === 'Manager' ? 'blue' : 'green'}>
+                    {role}
+                  </Tag>
+                ))}
+              </Space>
+            </Space>
+            <Space>
+              <CalendarOutlined style={{ color: '#666', minWidth: 20 }} />
+              <span>Last Login: {user.lastLogin ? format(new Date(user.lastLogin), 'dd/MM/yyyy HH:mm') : 'Never'}</span>
+            </Space>
+          </Space>
+        </Col>
+        
+        <Col span={24}>
+          <Divider style={{ margin: '8px 0' }} />
+          <Space>
+            {hasPermission(user, Permissions.USER_UPDATE) && (
+              <Button
+                icon={<LockOutlined />}
+                onClick={() => handleResetPassword(user.id)}
+                size="small"
+                title="Đổi mật khẩu"
+              >
+                Đổi MK
+              </Button>
+            )}
+            {canUpdateUser && (
+              <Button icon={<EditOutlined />} onClick={() => handleEdit(user)} size="small" type="primary">
+                Edit
+              </Button>
+            )}
+            {canDeleteUser && (
+              <Popconfirm
+                title="Delete User"
+                description="Are you sure you want to delete this user?"
+                onConfirm={() => handleDelete(user.id)}
+                okText="Yes"
+                cancelText="No"
+              >
+                <Button icon={<DeleteCircleOutlined />} danger size="small">
+                  Delete
+                </Button>
+              </Popconfirm>
+            )}
+          </Space>
+        </Col>
+      </Row>
+    </Card>
+  );
+
   return (
     <div>
       <Breadcrumb
@@ -498,25 +606,56 @@ const UsersPage = () => {
           </Col>
         </Row>
 
-        <Table
-          columns={columns}
-          dataSource={users}
-          rowKey="id"
-          loading={loading}
-          pagination={{
-            current: currentPage,
-            pageSize: pageSize,
-            total: total,
-            showSizeChanger: true,
-            showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} users`,
-            onChange: (page, size) => {
-              setCurrentPage(page);
-              setPageSize(size || 10);
-            },
-          }}
-          scroll={{ x: 1400 }}
-          size="small"
-        />
+        {/* Mobile View - Card Layout */}
+        {isMobile ? (
+          <div style={{ marginTop: 16 }}>
+            {users.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: 40, color: '#999' }}>
+                Không có người dùng nào
+              </div>
+            ) : (
+              <>
+                {users.map((userItem) => (
+                  <UserCard key={userItem.id} user={userItem} />
+                ))}
+                {/* Mobile Pagination */}
+                <div style={{ marginTop: 16, textAlign: 'center' }}>
+                  <Pagination
+                    current={currentPage}
+                    pageSize={pageSize}
+                    total={total}
+                    showSizeChanger
+                    onChange={(page, size) => {
+                      setCurrentPage(page);
+                      setPageSize(size || 10);
+                    }}
+                  />
+                </div>
+              </>
+            )}
+          </div>
+        ) : (
+          /* Desktop View - Table Layout */
+          <Table
+            columns={columns}
+            dataSource={users}
+            rowKey="id"
+            loading={loading}
+            pagination={{
+              current: currentPage,
+              pageSize: pageSize,
+              total: total,
+              showSizeChanger: true,
+              showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} users`,
+              onChange: (page, size) => {
+                setCurrentPage(page);
+                setPageSize(size || 10);
+              },
+            }}
+            scroll={{ x: 1400 }}
+            size="small"
+          />
+        )}
       </Card>
 
       <Modal
