@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Table, Button, Modal, Form, Input, Select, message, Space, Popconfirm, Row, Col, Card, Divider, Tag } from 'antd';
-import { PlusOutlined, EditOutlined, DeleteOutlined, WifiOutlined, BarcodeOutlined, DesktopOutlined, EnvironmentOutlined, CheckCircleOutlined, CloseCircleOutlined, LaptopOutlined } from '@ant-design/icons';
+import { PlusOutlined, EditOutlined, DeleteOutlined, WifiOutlined, BarcodeOutlined, DesktopOutlined, EnvironmentOutlined, LaptopOutlined } from '@ant-design/icons';
 import type { IPAddress, IPAddressCreateRequest, IPAddressUpdateRequest } from '../types/ip';
 import { ipService } from '../services/ip.service';
 import { unitService } from '../services/unit.service';
@@ -69,7 +69,7 @@ const IPListPage = () => {
     fetchUnits();
 
     // Listen for permissions update notifications - to refresh IP list when permissions change
-    const unsubscribePermissions = signalRService.onPermissionsUpdated((notification: PermissionUpdateNotification) => {
+    const unsubscribePermissions = signalRService.onPermissionsUpdated((_notification: PermissionUpdateNotification) => {
       // Re-fetch IP addresses when permissions change
       fetchIPAddresses();
     });

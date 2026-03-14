@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Table, Button, Input, Space, Tag, message, Card, Breadcrumb, Typography, Popconfirm, Select, Modal, Form, Divider, Row, Col } from 'antd';
-import { PlusOutlined, EditOutlined, DeleteOutlined, SearchOutlined, ReloadOutlined, WifiOutlined, BarcodeOutlined, DesktopOutlined, EnvironmentOutlined, CheckCircleOutlined, CloseCircleOutlined, LaptopOutlined } from '@ant-design/icons';
+import { PlusOutlined, EditOutlined, DeleteOutlined, SearchOutlined, ReloadOutlined, WifiOutlined, BarcodeOutlined, DesktopOutlined, EnvironmentOutlined, LaptopOutlined } from '@ant-design/icons';
 import type { IPAddress, IPAddressCreateRequest, IPAddressUpdateRequest } from '../types/ip';
 import { ipService } from '../services/ip.service';
 import { unitService } from '../services/unit.service';

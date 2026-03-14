@@ -1,20 +1,19 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Table, Button, Modal, Form, Input, Select, message, Space, Popconfirm, Tag, Card, Row, Col, Typography } from 'antd';
-import { PlusOutlined, EditOutlined, DeleteOutlined, SearchOutlined, EnvironmentOutlined, CheckCircleOutlined, CloseCircleOutlined, WifiOutlined } from '@ant-design/icons';
+import { PlusOutlined, EditOutlined, DeleteOutlined, SearchOutlined, EnvironmentOutlined, WifiOutlined } from '@ant-design/icons';
 import type { Unit, UnitCreateRequest, UnitUpdateRequest } from '../types/unit';
 import { unitService } from '../services/unit.service';
 import { useNavigate } from 'react-router-dom';
 import { useAppSelector } from '../hooks/useAppSelector';
 import { hasPermission, Permissions } from '../utils/permissions';
 import { signalRService } from '../services/signalr.service';
-import type { UnitUpdateNotification, PermissionUpdateNotification } from '../types/notification';
+import type { UnitUpdateNotification } from '../types/notification';
 
 const { Title } = Typography;
 const { Search } = Input;
 
 const UnitsPage = () => {
   const user = useAppSelector((state) => state.auth.user);
-  const isLoading = useAppSelector((state) => state.auth.isLoading);
   const [units, setUnits] = useState<Unit[]>([]);
   const [filteredUnits, setFilteredUnits] = useState<Unit[]>([]);
   const [loading, setLoading] = useState(false);
@@ -60,7 +59,7 @@ const UnitsPage = () => {
     });
 
     // Listen for permissions update notifications - to refresh units list when permissions change
-    const unsubscribePermissions = signalRService.onPermissionsUpdated((notification: PermissionUpdateNotification) => {
+    const unsubscribePermissions = signalRService.onPermissionsUpdated(() => {
       // Re-fetch units list when permissions change (user may have lost access to some units)
       fetchUnits();
     });

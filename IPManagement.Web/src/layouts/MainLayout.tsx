@@ -132,7 +132,7 @@ const MainLayout = ({ children }: { children: React.ReactNode }) => {
       </div>
       <Menu
         mode="inline"
-        selectedKeys={[currentKey]}
+        selectedKeys={[currentKey as string]}
         items={menuItems}
         className="sidebar-menu"
         onClick={({ key }) => {

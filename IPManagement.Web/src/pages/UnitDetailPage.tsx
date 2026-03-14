@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Table, Button, Modal, Form, Input, Select, message, Space, Popconfirm, Card, Row, Col, Typography, Tag, Breadcrumb } from 'antd';
-import { PlusOutlined, EditOutlined, DeleteOutlined, ArrowLeftOutlined, WifiOutlined, BarcodeOutlined, DesktopOutlined, LaptopOutlined } from '@ant-design/icons';
+import { PlusOutlined, EditOutlined, DeleteOutlined, ArrowLeftOutlined, WifiOutlined } from '@ant-design/icons';
 import type { IPAddress, IPAddressCreateRequest, IPAddressUpdateRequest } from '../types/ip';
 import { ipService } from '../services/ip.service';
 import { unitService } from '../services/unit.service';
@@ -95,7 +95,7 @@ const UnitDetailPage = () => {
     });
 
     // Listen for permissions update notifications - to refresh when permissions change
-    const unsubscribePermissions = signalRService.onPermissionsUpdated((notification: PermissionUpdateNotification) => {
+    const unsubscribePermissions = signalRService.onPermissionsUpdated((_notification: PermissionUpdateNotification) => {
       // Re-fetch data when permissions change (user may have lost access)
       if (id) {
         fetchUnit();

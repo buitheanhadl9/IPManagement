@@ -11,7 +11,7 @@ import { useAppSelector } from '../hooks/useAppSelector';
 import { hasPermission, Permissions } from '../utils/permissions';
 import { authService } from '../services/auth.service';
 import { signalRService } from '../services/signalr.service';
-import type { UnitUpdateNotification, PermissionUpdateNotification } from '../types/notification';
+import type { UnitUpdateNotification } from '../types/notification';
 
 const { Title } = Typography;
 const { Search } = Input;
@@ -23,7 +23,6 @@ interface UnitAssignmentForm {
 
 const UsersPage = () => {
   const user = useAppSelector((state) => state.auth.user);
-  const isLoading = useAppSelector((state) => state.auth.isLoading);
   const [users, setUsers] = useState<User[]>([]);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [units, setUnits] = useState<{ id: number; name: string }[]>([]);
@@ -67,7 +66,7 @@ const UsersPage = () => {
     });
 
     // Listen to permissions updates via SignalR
-    const unsubscribePermissions = signalRService.onPermissionsUpdated((notification: PermissionUpdateNotification) => {
+    const unsubscribePermissions = signalRService.onPermissionsUpdated(() => {
       // Refresh users list when permissions change
       fetchUsers();
     });
