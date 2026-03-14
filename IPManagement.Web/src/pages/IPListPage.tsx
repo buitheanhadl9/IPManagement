@@ -10,6 +10,7 @@ import { useAppSelector } from '../hooks/useAppSelector';
 import { hasPermission, Permissions } from '../utils/permissions';
 import { signalRService } from '../services/signalr.service';
 import type { PermissionUpdateNotification } from '../types/notification';
+import TruncatedDescription from '../components/TruncatedDescription';
 
 const IPListPage = () => {
   const user = useAppSelector((state) => state.auth.user);
@@ -229,6 +230,13 @@ const IPListPage = () => {
       ),
     },
     {
+      title: 'Description',
+      dataIndex: 'description',
+      key: 'description',
+      width: 200,
+      render: (desc: string | undefined) => <TruncatedDescription description={desc} />,
+    },
+    {
       title: 'Actions',
       key: 'actions',
       width: 100,
@@ -434,6 +442,13 @@ const IPListPage = () => {
                 pagination={{ pageSize: 10, showSizeChanger: true }}
                 scroll={{ x: 800 }}
                 size="small"
+                rowClassName={(record) => {
+                  // Check if this IP address is duplicated within the same unit
+                  const duplicateIPs = ipAddresses.filter(
+                    (ip) => ip.ipAddress === record.ipAddress && ip.id !== record.id
+                  );
+                  return duplicateIPs.length > 0 ? 'duplicate-ip-row' : '';
+                }}
               />
             )}
           </Card>

@@ -513,6 +513,16 @@ a:hover {
   transform: translateY(-2px);
 }
 
+/* Duplicate IP Row Styles */
+.duplicate-ip-row > td {
+  background-color: #fff1f0 !important;
+  border-color: #ffccc7 !important;
+}
+
+.duplicate-ip-row > td:first-child {
+  border-left: 3px solid #ff4d4f;
+}
+
 /* IP Mobile Card Styles */
 .ip-mobile-card {
   border-radius: 8px;

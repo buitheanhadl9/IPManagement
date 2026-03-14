@@ -10,6 +10,7 @@ import { useAppSelector } from '../hooks/useAppSelector';
 import { hasPermission, Permissions, isAssignedToUnit, isAdmin } from '../utils/permissions';
 import { signalRService } from '../services/signalr.service';
 import type { UnitUpdateNotification, PermissionUpdateNotification } from '../types/notification';
+import TruncatedDescription from '../components/TruncatedDescription';
 
 const { Title } = Typography;
 
@@ -266,14 +267,11 @@ const UnitDetailPage = () => {
       render: (port: string | undefined) => port || '-',
     },
     {
-      title: 'Status',
-      dataIndex: 'status',
-      key: 'status',
-      render: (status: string) => (
-        <Tag color={status === 'Active' ? 'green' : status === 'Reserved' ? 'orange' : 'red'}>
-          {status}
-        </Tag>
-      ),
+      title: 'Description',
+      dataIndex: 'description',
+      key: 'description',
+      width: 200,
+      render: (desc: string | undefined) => <TruncatedDescription description={desc} />,
     },
     {
       title: 'Actions',
@@ -466,6 +464,13 @@ const UnitDetailPage = () => {
             pagination={{ pageSize: 10, showSizeChanger: true }}
             scroll={{ x: 1000 }}
             size="small"
+            rowClassName={(record) => {
+              // Check if this IP address is duplicated within the same unit
+              const duplicateIPs = ipAddresses.filter(
+                (ip) => ip.ipAddress === record.ipAddress && ip.id !== record.id
+              );
+              return duplicateIPs.length > 0 ? 'duplicate-ip-row' : '';
+            }}
           />
         )}
       </Card>

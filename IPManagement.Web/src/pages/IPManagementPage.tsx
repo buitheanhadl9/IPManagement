@@ -8,6 +8,7 @@ import type { Unit } from '../types/unit';
 import { format } from 'date-fns';
 import { useAppSelector } from '../hooks/useAppSelector';
 import { hasPermission, Permissions } from '../utils/permissions';
+import TruncatedDescription from '../components/TruncatedDescription';
 
 const { Title } = Typography;
 const { Search } = Input;
@@ -141,13 +142,14 @@ const IPManagementPage = () => {
     }
   };
 
-  const columns = [
+  const columns: any[] = [
     {
       title: 'IP Address',
       dataIndex: 'ipAddress',
       key: 'ipAddress',
       width: 150,
       sorter: (a: IPAddress, b: IPAddress) => a.ipAddress.localeCompare(b.ipAddress),
+      resizable: true,
     },
     {
       title: 'MAC Address',
@@ -155,6 +157,7 @@ const IPManagementPage = () => {
       key: 'macAddress',
       width: 150,
       render: (mac: string | undefined) => mac || '-',
+      resizable: true,
     },
     {
       title: 'Device Name',
@@ -162,6 +165,7 @@ const IPManagementPage = () => {
       key: 'deviceName',
       width: 150,
       render: (name: string | undefined) => name || '-',
+      resizable: true,
     },
     {
       title: 'Device Type',
@@ -169,6 +173,7 @@ const IPManagementPage = () => {
       key: 'deviceType',
       width: 120,
       render: (type: string | undefined) => type || '-',
+      resizable: true,
     },
     {
       title: 'Port',
@@ -176,6 +181,7 @@ const IPManagementPage = () => {
       key: 'port',
       width: 80,
       render: (port: string | undefined) => port || '-',
+      resizable: true,
     },
     {
       title: 'Unit',
@@ -183,17 +189,15 @@ const IPManagementPage = () => {
       key: 'unitName',
       width: 150,
       render: (unitName: string | undefined) => unitName || '-',
+      resizable: true,
     },
     {
-      title: 'Status',
-      dataIndex: 'status',
-      key: 'status',
-      width: 100,
-      render: (status: string) => (
-        <Tag color={status === 'Active' ? 'green' : status === 'Reserved' ? 'orange' : 'red'}>
-          {status}
-        </Tag>
-      ),
+      title: 'Description',
+      dataIndex: 'description',
+      key: 'description',
+      width: 200,
+      render: (desc: string | undefined) => <TruncatedDescription description={desc} />,
+      resizable: true,
     },
     {
       title: 'Created At',
@@ -201,6 +205,7 @@ const IPManagementPage = () => {
       key: 'createdAt',
       width: 160,
       render: (date: string | undefined) => date ? format(new Date(date), 'dd/MM/yyyy HH:mm') : '-',
+      resizable: true,
     },
     {
       title: 'Thao tác',
@@ -208,6 +213,7 @@ const IPManagementPage = () => {
       align: 'center' as const,
       width: 100,
       fixed: 'right' as const,
+      resizable: false,
       render: (_: unknown, record: IPAddress) => {
         const actions = [];
         
@@ -406,9 +412,12 @@ const IPManagementPage = () => {
             <Button icon={<ReloadOutlined />} onClick={fetchIPAddresses}>
               Làm mới
             </Button>
+            {canCreateIP && (
+              <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
+                Thêm IP Address
+              </Button>
+            )}
           </Space>
-
-
 
           {/* Mobile View - Card Layout */}
           {isMobile ? (
@@ -434,15 +443,15 @@ const IPManagementPage = () => {
               loading={loading}
               pagination={{ pageSize: 10 }}
               scroll={{ x: 1200 }}
+              rowClassName={(record) => {
+                // Check if this IP address is duplicated within the same unit
+                const duplicateIPs = ipAddresses.filter(
+                  (ip) => ip.ipAddress === record.ipAddress && ip.id !== record.id
+                );
+                return duplicateIPs.length > 0 ? 'duplicate-ip-row' : '';
+              }}
               footer={() => (
-                <Space style={{ justifyContent: 'space-between' }}>
-                  <span>Tổng số: {ipAddresses.length} IP addresses</span>
-                  {canCreateIP && (
-                    <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
-                      Thêm IP Address
-                    </Button>
-                  )}
-                </Space>
+                <span>Tổng số: {ipAddresses.length} IP addresses</span>
               )}
             />
           )}

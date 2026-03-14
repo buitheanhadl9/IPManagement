@@ -8,6 +8,7 @@ import { useAppSelector } from '../hooks/useAppSelector';
 import { hasPermission, Permissions } from '../utils/permissions';
 import { signalRService } from '../services/signalr.service';
 import type { UnitUpdateNotification } from '../types/notification';
+import TruncatedDescription from '../components/TruncatedDescription';
 
 const { Title } = Typography;
 const { Search } = Input;
@@ -193,7 +194,8 @@ const UnitsPage = () => {
       title: 'Mô tả',
       dataIndex: 'description',
       key: 'description',
-      render: (description: string | undefined) => description || '-',
+      width: 300,
+      render: (description: string | undefined) => <TruncatedDescription description={description} />,
     },
     {
       title: 'Số IP',
