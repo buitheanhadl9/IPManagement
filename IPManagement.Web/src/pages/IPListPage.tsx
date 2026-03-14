@@ -13,6 +13,7 @@ import type { PermissionUpdateNotification } from '../types/notification';
 
 const IPListPage = () => {
   const user = useAppSelector((state) => state.auth.user);
+  const isLoading = useAppSelector((state) => state.auth.isLoading);
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
   
   // Debug: Log user info
@@ -37,10 +38,11 @@ const IPListPage = () => {
   const [form] = Form.useForm();
 
   // Check permissions - use useMemo to re-calculate when user changes
-  const canReadIP = useMemo(() => hasPermission(user, Permissions.IP_READ), [user]);
-  const canCreateIP = useMemo(() => hasPermission(user, Permissions.IP_CREATE), [user]);
-  const canUpdateIP = useMemo(() => hasPermission(user, Permissions.IP_UPDATE), [user]);
-  const canDeleteIP = useMemo(() => hasPermission(user, Permissions.IP_DELETE), [user]);
+  // Chỉ check permission khi đã load xong user
+  const canReadIP = useMemo(() => user ? hasPermission(user, Permissions.IP_READ) : false, [user]);
+  const canCreateIP = useMemo(() => user ? hasPermission(user, Permissions.IP_CREATE) : false, [user]);
+  const canUpdateIP = useMemo(() => user ? hasPermission(user, Permissions.IP_UPDATE) : false, [user]);
+  const canDeleteIP = useMemo(() => user ? hasPermission(user, Permissions.IP_DELETE) : false, [user]);
 
   // Handle window resize for responsive design
   useEffect(() => {
@@ -327,6 +329,34 @@ const IPListPage = () => {
       </Card>
     );
   };
+
+  // Đang tải thông tin người dùng
+  if (isLoading || !user) {
+    return (
+      <div style={{
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        height: '400px'
+      }}>
+        <div style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center'
+        }}>
+          <div style={{
+            width: '40px',
+            height: '40px',
+            border: '4px solid #f3f3f3',
+            borderTop: '4px solid #3498db',
+            borderRadius: '50%',
+            animation: 'spin 1s linear infinite'
+          }} />
+          <p style={{ marginTop: '16px', color: '#666' }}>Đang tải...</p>
+        </div>
+      </div>
+    );
+  }
 
   // Nếu không có quyền IP_READ, hiển thị thông báo
   if (!canReadIP) {

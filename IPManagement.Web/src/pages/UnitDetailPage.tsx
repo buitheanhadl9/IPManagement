@@ -31,10 +31,11 @@ const UnitDetailPage = () => {
   const [checkingAccess, setCheckingAccess] = useState(true);
 
   // Check permissions - use useMemo to re-calculate when user changes
-  const canCreateIP = useMemo(() => hasPermission(user, Permissions.IP_CREATE), [user]);
-  const canUpdateIP = useMemo(() => hasPermission(user, Permissions.IP_UPDATE), [user]);
-  const canDeleteIP = useMemo(() => hasPermission(user, Permissions.IP_DELETE), [user]);
-  const canReadIP = useMemo(() => hasPermission(user, Permissions.IP_READ), [user]);
+  // Chỉ check permission khi đã load xong user
+  const canCreateIP = useMemo(() => user ? hasPermission(user, Permissions.IP_CREATE) : false, [user]);
+  const canUpdateIP = useMemo(() => user ? hasPermission(user, Permissions.IP_UPDATE) : false, [user]);
+  const canDeleteIP = useMemo(() => user ? hasPermission(user, Permissions.IP_DELETE) : false, [user]);
+  const canReadIP = useMemo(() => user ? hasPermission(user, Permissions.IP_READ) : false, [user]);
 
   // Handle window resize for responsive design
   useEffect(() => {

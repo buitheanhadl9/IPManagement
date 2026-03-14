@@ -57,6 +57,7 @@ const PERMISSION_CATEGORIES = {
 
 const RolesPage = () => {
   const user = useAppSelector((state) => state.auth.user);
+  const isLoading = useAppSelector((state) => state.auth.isLoading);
   const [roles, setRoles] = useState<Role[]>([]);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [loading, setLoading] = useState(false);
@@ -92,12 +93,40 @@ const RolesPage = () => {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Nếu chưa có user hoặc không có quyền, hiển thị thông báo
-  if (!user || !hasAccess) {
+  // Đang tải thông tin người dùng
+  if (isLoading || !user) {
+    return (
+      <div style={{
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        height: '400px'
+      }}>
+        <div style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center'
+        }}>
+          <div style={{
+            width: '40px',
+            height: '40px',
+            border: '4px solid #f3f3f3',
+            borderTop: '4px solid #3498db',
+            borderRadius: '50%',
+            animation: 'spin 1s linear infinite'
+          }} />
+          <p style={{ marginTop: '16px', color: '#666' }}>Đang tải...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Nếu không có quyền, hiển thị thông báo
+  if (!hasAccess) {
     return (
       <div>
         <Title level={2}>Không có quyền truy cập</Title>
-        <p>{!user ? 'Đang tải thông tin người dùng...' : 'Bạn không có quyền truy cập trang quản lý role.'}</p>
+        <p>Bạn không có quyền truy cập trang quản lý role.</p>
       </div>
     );
   }

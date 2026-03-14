@@ -14,6 +14,7 @@ const { Search } = Input;
 
 const UnitsPage = () => {
   const user = useAppSelector((state) => state.auth.user);
+  const isLoading = useAppSelector((state) => state.auth.isLoading);
   const [units, setUnits] = useState<Unit[]>([]);
   const [filteredUnits, setFilteredUnits] = useState<Unit[]>([]);
   const [loading, setLoading] = useState(false);
@@ -25,9 +26,10 @@ const UnitsPage = () => {
   const navigate = useNavigate();
 
   // Check permissions based on user permissions - use useMemo to re-calculate when user changes
-  const canCreateUnit = useMemo(() => hasPermission(user, Permissions.UNIT_CREATE), [user]);
-  const canUpdateUnit = useMemo(() => hasPermission(user, Permissions.UNIT_UPDATE), [user]);
-  const canDeleteUnit = useMemo(() => hasPermission(user, Permissions.UNIT_DELETE), [user]);
+  // Chỉ check permission khi đã load xong user
+  const canCreateUnit = useMemo(() => user ? hasPermission(user, Permissions.UNIT_CREATE) : false, [user]);
+  const canUpdateUnit = useMemo(() => user ? hasPermission(user, Permissions.UNIT_UPDATE) : false, [user]);
+  const canDeleteUnit = useMemo(() => user ? hasPermission(user, Permissions.UNIT_DELETE) : false, [user]);
 
   // Handle window resize for responsive design
   useEffect(() => {

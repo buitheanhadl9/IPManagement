@@ -14,6 +14,7 @@ const { Search } = Input;
 
 const IPManagementPage = () => {
   const user = useAppSelector((state) => state.auth.user);
+  const isLoading = useAppSelector((state) => state.auth.isLoading);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   
   const [ipAddresses, setIPAddresses] = useState<IPAddress[]>([]);
@@ -27,10 +28,11 @@ const IPManagementPage = () => {
   const [units, setUnits] = useState<{ id: number; name: string }[]>([]);
   
   // Check permissions (dùng Unified Roles - level cao nhất trong units áp dụng toàn hệ thống)
-  const canReadIP = hasPermission(user, Permissions.IP_READ);
-  const canCreateIP = hasPermission(user, Permissions.IP_CREATE);
-  const canUpdateIP = hasPermission(user, Permissions.IP_UPDATE);
-  const canDeleteIP = hasPermission(user, Permissions.IP_DELETE);
+  // Chỉ check permission khi đã load xong user
+  const canReadIP = user ? hasPermission(user, Permissions.IP_READ) : false;
+  const canCreateIP = user ? hasPermission(user, Permissions.IP_CREATE) : false;
+  const canUpdateIP = user ? hasPermission(user, Permissions.IP_UPDATE) : false;
+  const canDeleteIP = user ? hasPermission(user, Permissions.IP_DELETE) : false;
 
   // Handle window resize for responsive design
   useEffect(() => {
@@ -311,6 +313,34 @@ const IPManagementPage = () => {
       </Card>
     );
   };
+
+  // Đang tải thông tin người dùng
+  if (isLoading || !user) {
+    return (
+      <div style={{
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        height: '400px'
+      }}>
+        <div style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center'
+        }}>
+          <div style={{
+            width: '40px',
+            height: '40px',
+            border: '4px solid #f3f3f3',
+            borderTop: '4px solid #3498db',
+            borderRadius: '50%',
+            animation: 'spin 1s linear infinite'
+          }} />
+          <p style={{ marginTop: '16px', color: '#666' }}>Đang tải...</p>
+        </div>
+      </div>
+    );
+  }
 
   // Nếu không có quyền IP_READ, hiển thị thông báo
   if (!canReadIP) {

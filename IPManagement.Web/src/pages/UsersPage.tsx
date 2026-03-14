@@ -23,6 +23,7 @@ interface UnitAssignmentForm {
 
 const UsersPage = () => {
   const user = useAppSelector((state) => state.auth.user);
+  const isLoading = useAppSelector((state) => state.auth.isLoading);
   const [users, setUsers] = useState<User[]>([]);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [units, setUnits] = useState<{ id: number; name: string }[]>([]);
@@ -45,9 +46,10 @@ const UsersPage = () => {
   const [assignAllUnits, setAssignAllUnits] = useState(false);
 
   // Check permissions - use useMemo to re-calculate when user changes
-  const canCreateUser = useMemo(() => hasPermission(user, Permissions.USER_CREATE), [user]);
-  const canUpdateUser = useMemo(() => hasPermission(user, Permissions.USER_UPDATE), [user]);
-  const canDeleteUser = useMemo(() => hasPermission(user, Permissions.USER_DELETE), [user]);
+  // Chỉ check permission khi đã load xong user
+  const canCreateUser = useMemo(() => user ? hasPermission(user, Permissions.USER_CREATE) : false, [user]);
+  const canUpdateUser = useMemo(() => user ? hasPermission(user, Permissions.USER_UPDATE) : false, [user]);
+  const canDeleteUser = useMemo(() => user ? hasPermission(user, Permissions.USER_DELETE) : false, [user]);
 
   useEffect(() => {
     fetchUsers();
