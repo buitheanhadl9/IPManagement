@@ -11,6 +11,7 @@ import { hasPermission, Permissions, isAssignedToUnit, isAdmin } from '../utils/
 import { signalRService } from '../services/signalr.service';
 import type { UnitUpdateNotification, PermissionUpdateNotification } from '../types/notification';
 import TruncatedDescription from '../components/TruncatedDescription';
+import DrawingManagement from '../components/DrawingManagement';
 
 const { Title } = Typography;
 
@@ -37,6 +38,12 @@ const UnitDetailPage = () => {
   const canUpdateIP = useMemo(() => user ? hasPermission(user, Permissions.IP_UPDATE) : false, [user]);
   const canDeleteIP = useMemo(() => user ? hasPermission(user, Permissions.IP_DELETE) : false, [user]);
   const canReadIP = useMemo(() => user ? hasPermission(user, Permissions.IP_READ) : false, [user]);
+  
+  // Drawing permissions
+  const canCreateDrawing = useMemo(() => user ? hasPermission(user, Permissions.DRAWING_CREATE) : false, [user]);
+  const canUpdateDrawing = useMemo(() => user ? hasPermission(user, Permissions.DRAWING_UPDATE) : false, [user]);
+  const canDeleteDrawing = useMemo(() => user ? hasPermission(user, Permissions.DRAWING_DELETE) : false, [user]);
+  const canReadDrawing = useMemo(() => user ? hasPermission(user, Permissions.DRAWING_READ) : false, [user]);
 
   // Handle window resize for responsive design
   useEffect(() => {
@@ -474,6 +481,16 @@ const UnitDetailPage = () => {
           />
         )}
       </Card>
+
+      {id && unitName && (
+        <DrawingManagement
+          unitId={parseInt(id)}
+          unitName={unitName}
+          canCreate={canCreateDrawing && hasUnitAccess}
+          canUpdate={canUpdateDrawing && hasUnitAccess}
+          canDelete={canDeleteDrawing && hasUnitAccess}
+        />
+      )}
 
       <Modal
         title={editingId ? 'Sửa IP Address' : 'Thêm IP Address'}

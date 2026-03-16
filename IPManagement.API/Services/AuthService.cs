@@ -254,6 +254,7 @@ namespace IPManagement.API.Services
             var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
 
             var roles = _userManager.GetRolesAsync(user).Result;
+            Console.WriteLine($"[GenerateJwtToken] User: {user.UserName}, Roles: {string.Join(", ", roles)}");
             var roleClaims = roles.Select(role => new Claim(ClaimTypes.Role, role)).ToArray();
 
             // Get permissions from database based on user's roles
@@ -263,6 +264,8 @@ namespace IPManagement.API.Services
                 .Select(rp => rp.Permission)
                 .Distinct()
                 .ToList();
+            
+            Console.WriteLine($"[GenerateJwtToken] Permissions for {user.UserName}: {string.Join(", ", permissions)}");
 
             var permissionClaims = permissions.Select(p => new Claim("permission", p));
 

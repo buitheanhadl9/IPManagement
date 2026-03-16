@@ -11,6 +11,7 @@ namespace IPManagement.API.Authorization
         ROLE,            // Quản lý vai trò
         AUDIT_LOG,       // Xem nhật ký audit
         REPORT,          // Báo cáo
-        SETTINGS         // Cài đặt hệ thống
+        SETTINGS,        // Cài đặt hệ thống
+        DRAWING          // Quản lý bản vẽ
     }
 }

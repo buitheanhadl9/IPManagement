@@ -28,6 +28,12 @@ export const Permissions = {
   
   // Audit log permissions
   AUDIT_READ: 'audit_log:view',
+  
+  // Drawing permissions
+  DRAWING_CREATE: 'drawing:create',
+  DRAWING_READ: 'drawing:view',
+  DRAWING_UPDATE: 'drawing:update',
+  DRAWING_DELETE: 'drawing:delete',
 };
 
 // Role constants
@@ -58,6 +64,10 @@ const LEVEL_PERMISSIONS: Record<number, string[]> = {
     Permissions.IP_DELETE,
     Permissions.UNIT_READ,
     Permissions.USER_READ,
+    Permissions.DRAWING_READ,
+    Permissions.DRAWING_CREATE,
+    Permissions.DRAWING_UPDATE,
+    Permissions.DRAWING_DELETE,
   ],
   3: [
     Permissions.IP_READ,
@@ -72,6 +82,10 @@ const LEVEL_PERMISSIONS: Record<number, string[]> = {
     Permissions.USER_CREATE,
     Permissions.USER_UPDATE,
     Permissions.USER_DELETE,
+    Permissions.DRAWING_READ,
+    Permissions.DRAWING_CREATE,
+    Permissions.DRAWING_UPDATE,
+    Permissions.DRAWING_DELETE,
   ],
 };
 

@@ -30,6 +30,8 @@ namespace IPManagement.API.Models
         
         public ICollection<UserUnitAssignment> UserUnitAssignments { get; set; } = new List<UserUnitAssignment>();
         
+        public ICollection<Drawing> Drawings { get; set; } = new List<Drawing>();
+        
         [StringLength(1000)]
         public string? Description { get; set; }
         

@@ -53,6 +53,15 @@ const PERMISSION_CATEGORIES = {
       { key: Permissions.AUDIT_READ, label: 'Read' },
     ]
   },
+  DRAWING: {
+    label: 'Drawing',
+    permissions: [
+      { key: Permissions.DRAWING_CREATE, label: 'Create' },
+      { key: Permissions.DRAWING_READ, label: 'Read' },
+      { key: Permissions.DRAWING_UPDATE, label: 'Update' },
+      { key: Permissions.DRAWING_DELETE, label: 'Delete' },
+    ]
+  },
 };
 
 const RolesPage = () => {

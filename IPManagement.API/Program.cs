@@ -11,7 +11,9 @@ using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
+using Microsoft.Extensions.FileProviders;
 using System.Text;
+using System.IO;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -115,6 +117,7 @@ builder.Services.AddScoped<IUnitService, UnitService>();
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IRoleService, RoleService>();
 builder.Services.AddScoped<IPermissionNotificationService, PermissionNotificationService>();
+builder.Services.AddScoped<IDrawingService, DrawingService>();
 
 // Configure SignalR
 builder.Services.AddSignalR(options =>
@@ -153,6 +156,15 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseCors("AllowFrontend");
+
+// Serve static files for uploads (drawings)
+app.UseStaticFiles();
+app.UseStaticFiles(new StaticFileOptions
+{
+    FileProvider = new PhysicalFileProvider(
+        Path.Combine(Directory.GetCurrentDirectory(), "uploads")),
+    RequestPath = "/uploads"
+});
 
 app.UseHttpsRedirection();
 

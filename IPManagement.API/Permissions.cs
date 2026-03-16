@@ -33,5 +33,11 @@ namespace IPManagement.API
         
         // Audit log permissions
         public const string AuditRead = "audit_log:view";
+        
+        // Drawing permissions
+        public const string DrawingCreate = "drawing:create";
+        public const string DrawingRead = "drawing:view";
+        public const string DrawingUpdate = "drawing:update";
+        public const string DrawingDelete = "drawing:delete";
     }
 }

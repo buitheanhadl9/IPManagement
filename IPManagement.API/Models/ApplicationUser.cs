@@ -31,5 +31,9 @@ namespace IPManagement.API.Models
         public ICollection<AuditLog> AuditLogs { get; set; } = new List<AuditLog>();
         
         public ICollection<UserUnitAssignment> UserUnitAssignments { get; set; } = new List<UserUnitAssignment>();
+        
+        public ICollection<Drawing> CreatedDrawings { get; set; } = new List<Drawing>();
+        
+        public ICollection<Drawing> UpdatedDrawings { get; set; } = new List<Drawing>();
     }
 }

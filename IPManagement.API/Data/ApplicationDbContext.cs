@@ -20,6 +20,7 @@ namespace IPManagement.API.Data
         public DbSet<AuditLog> AuditLogs { get; set; }
         public DbSet<UserUnitAssignment> UserUnitAssignments { get; set; }
         public DbSet<RolePermission> RolePermissions { get; set; }
+        public DbSet<Drawing> Drawings { get; set; }
 
         protected override void OnModelCreating(ModelBuilder builder)
         {
@@ -84,6 +85,25 @@ namespace IPManagement.API.Data
                       .WithMany(u => u.UserUnitAssignments)
                       .HasForeignKey(e => e.UnitId)
                       .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            // Configure Drawing
+            builder.Entity<Drawing>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.ExternalId).HasDefaultValueSql("gen_random_uuid()");
+                entity.HasOne(e => e.Unit)
+                      .WithMany(u => u.Drawings)
+                      .HasForeignKey(e => e.UnitId)
+                      .OnDelete(DeleteBehavior.Cascade);
+                entity.HasOne(e => e.CreatedByUser)
+                      .WithMany(u => u.CreatedDrawings)
+                      .HasForeignKey(e => e.CreatedBy)
+                      .OnDelete(DeleteBehavior.Restrict);
+                entity.HasOne(e => e.UpdatedByUser)
+                      .WithMany(u => u.UpdatedDrawings)
+                      .HasForeignKey(e => e.UpdatedBy)
+                      .OnDelete(DeleteBehavior.Restrict);
             });
         }
 
