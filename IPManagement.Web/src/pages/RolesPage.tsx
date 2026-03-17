@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Table, Button, Modal, Form, Input, message, Space, Tag, Card, Row, Col, Typography, Breadcrumb, Popconfirm, Checkbox, Divider } from 'antd';
-import { PlusOutlined, EditOutlined, DeleteOutlined, UserOutlined, KeyOutlined, FileTextOutlined } from '@ant-design/icons';
+import { Table, Button, Modal, Form, Input, message, Space, Tag, Card, Row, Col, Typography, Breadcrumb, Popconfirm, Checkbox, Divider, Dropdown } from 'antd';
+import { PlusOutlined, EditOutlined, DeleteOutlined, UserOutlined, KeyOutlined, FileTextOutlined, ToolOutlined, WifiOutlined } from '@ant-design/icons';
 import { roleService } from '../services/role.service';
 import { permissionService } from '../services/permission.service';
 import type { Role, CreateRoleRequest } from '../types/role';
@@ -60,6 +60,15 @@ const PERMISSION_CATEGORIES = {
       { key: Permissions.DRAWING_READ, label: 'Read' },
       { key: Permissions.DRAWING_UPDATE, label: 'Update' },
       { key: Permissions.DRAWING_DELETE, label: 'Delete' },
+    ]
+  },
+  NETWORK_SYSTEM: {
+    label: 'Network System',
+    permissions: [
+      { key: Permissions.NETWORK_SYSTEM_CREATE, label: 'Create' },
+      { key: Permissions.NETWORK_SYSTEM_READ, label: 'Read' },
+      { key: Permissions.NETWORK_SYSTEM_UPDATE, label: 'Update' },
+      { key: Permissions.NETWORK_SYSTEM_DELETE, label: 'Delete' },
     ]
   },
 };
@@ -304,38 +313,45 @@ const RolesPage = () => {
       title: 'Actions',
       key: 'actions',
       align: 'center' as const,
-      width: 250,
+      width: 100,
       fixed: 'right' as const,
-      render: (_: unknown, record: Role) => (
-          <Space>
-          {/* Nút quản lý permissions - chỉ hiện nếu có quyền */}
-          {canManagePermissions && (
-            <Button 
-              icon={<KeyOutlined />} 
-              onClick={() => handleManagePermissions(record)} 
-              size="small"
-            >
-              Permissions
-            </Button>
-          )}
-          {/* Cho phép chỉnh sửa tất cả roles - chỉ hiện nếu có quyền */}
-          {canUpdateRole && (
-            <Button icon={<EditOutlined />} onClick={() => handleEdit(record)} size="small" />
-          )}
-          {/* Không cho phép xóa role mặc định - chỉ hiện nếu có quyền */}
-          {canDeleteRole && !['Admin', 'Manager', 'User'].includes(record.name) && (
-            <Popconfirm
-              title="Delete Role"
-              description="Are you sure you want to delete this role?"
-              onConfirm={() => handleDelete(record.id, record.name)}
-              okText="Yes"
-              cancelText="No"
-            >
-              <Button icon={<DeleteOutlined />} danger size="small" />
-            </Popconfirm>
-          )}
-        </Space>
-      ),
+      render: (_: unknown, record: Role) => {
+        const items = [
+          {
+            key: 'permissions',
+            label: 'Permissions',
+            icon: <KeyOutlined />,
+            onClick: () => handleManagePermissions(record),
+            disabled: !canManagePermissions,
+          },
+          {
+            key: 'edit',
+            label: 'Sửa',
+            icon: <EditOutlined />,
+            onClick: () => handleEdit(record),
+            disabled: !canUpdateRole,
+          },
+          {
+            key: 'delete',
+            label: 'Xóa',
+            icon: <DeleteOutlined />,
+            onClick: () => {
+              if (canDeleteRole && !['Admin', 'Manager', 'User'].includes(record.name)) {
+                if (window.confirm('Bạn có chắc chắn muốn xóa role này?')) {
+                  handleDelete(record.id, record.name);
+                }
+              }
+            },
+            disabled: !canDeleteRole || ['Admin', 'Manager', 'User'].includes(record.name),
+          },
+        ];
+
+        return (
+          <Dropdown menu={{ items }} placement="bottomRight" trigger={['click']} getPopupContainer={(_trigger) => document.body}>
+            <Button icon={<ToolOutlined />} size="small" type="text" />
+          </Dropdown>
+        );
+      },
     },
   ];
 
@@ -374,35 +390,45 @@ const RolesPage = () => {
         
         <Col span={24}>
           <Divider style={{ margin: '8px 0' }} />
-          <Space>
-            {canManagePermissions && (
-              <Button 
-                icon={<KeyOutlined />} 
-                onClick={() => handleManagePermissions(role)} 
-                size="small"
-              >
-                Permissions
-              </Button>
-            )}
-            {canUpdateRole && (
-              <Button icon={<EditOutlined />} onClick={() => handleEdit(role)} size="small" type="primary">
-                Edit
-              </Button>
-            )}
-            {canDeleteRole && !['Admin', 'Manager', 'User'].includes(role.name) && (
-              <Popconfirm
-                title="Delete Role"
-                description="Are you sure you want to delete this role?"
-                onConfirm={() => handleDelete(role.id, role.name)}
-                okText="Yes"
-                cancelText="No"
-              >
-                <Button icon={<DeleteOutlined />} danger size="small">
-                  Delete
+          {(() => {
+            const items = [
+              {
+                key: 'permissions',
+                label: 'Permissions',
+                icon: <KeyOutlined />,
+                onClick: () => handleManagePermissions(role),
+                disabled: !canManagePermissions,
+              },
+              {
+                key: 'edit',
+                label: 'Sửa',
+                icon: <EditOutlined />,
+                onClick: () => handleEdit(role),
+                disabled: !canUpdateRole,
+              },
+              {
+                key: 'delete',
+                label: 'Xóa',
+                icon: <DeleteOutlined />,
+                onClick: () => {
+                  if (canDeleteRole && !['Admin', 'Manager', 'User'].includes(role.name)) {
+                    if (window.confirm('Bạn có chắc chắn muốn xóa role này?')) {
+                      handleDelete(role.id, role.name);
+                    }
+                  }
+                },
+                disabled: !canDeleteRole || ['Admin', 'Manager', 'User'].includes(role.name),
+              },
+            ];
+
+            return (
+              <Dropdown menu={{ items }} placement="bottomRight" trigger={['click']} getPopupContainer={(_trigger) => document.body}>
+                <Button icon={<ToolOutlined />} size="small" type="text">
+                  Hành động
                 </Button>
-              </Popconfirm>
-            )}
-          </Space>
+              </Dropdown>
+            );
+          })()}
         </Col>
       </Row>
     </Card>

@@ -30,6 +30,8 @@ namespace IPManagement.API.DTOs
         public string Status { get; set; } = "active";
 
         public long? UnitId { get; set; }
+        
+        public long? NetworkSystemId { get; set; }
     }
 
     public class IPAddressUpdateRequest
@@ -57,6 +59,8 @@ namespace IPManagement.API.DTOs
 
         [StringLength(20)]
         public string Status { get; set; } = "active";
+        
+        public long? NetworkSystemId { get; set; }
     }
 
     public class IPAddressDto
@@ -76,6 +80,8 @@ namespace IPManagement.API.DTOs
         public DateTime? UpdatedAt { get; set; }
         public bool IsOnline { get; set; }
         public DateTime? LastPingTime { get; set; }
+        public long? NetworkSystemId { get; set; }
+        public string? NetworkSystemName { get; set; }
     }
 
     public class IPAddressListResponse

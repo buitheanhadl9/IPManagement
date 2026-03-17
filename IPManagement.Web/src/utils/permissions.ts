@@ -34,6 +34,12 @@ export const Permissions = {
   DRAWING_READ: 'drawing:view',
   DRAWING_UPDATE: 'drawing:update',
   DRAWING_DELETE: 'drawing:delete',
+  
+  // Network System permissions
+  NETWORK_SYSTEM_CREATE: 'network_system:create',
+  NETWORK_SYSTEM_READ: 'network_system:view',
+  NETWORK_SYSTEM_UPDATE: 'network_system:update',
+  NETWORK_SYSTEM_DELETE: 'network_system:delete',
 };
 
 // Role constants
@@ -56,6 +62,7 @@ const LEVEL_PERMISSIONS: Record<number, string[]> = {
     Permissions.IP_READ,
     Permissions.UNIT_READ,
     Permissions.USER_READ,
+    Permissions.NETWORK_SYSTEM_READ,
   ],
   2: [
     Permissions.IP_READ,
@@ -68,6 +75,10 @@ const LEVEL_PERMISSIONS: Record<number, string[]> = {
     Permissions.DRAWING_CREATE,
     Permissions.DRAWING_UPDATE,
     Permissions.DRAWING_DELETE,
+    Permissions.NETWORK_SYSTEM_READ,
+    Permissions.NETWORK_SYSTEM_CREATE,
+    Permissions.NETWORK_SYSTEM_UPDATE,
+    Permissions.NETWORK_SYSTEM_DELETE,
   ],
   3: [
     Permissions.IP_READ,
@@ -86,6 +97,10 @@ const LEVEL_PERMISSIONS: Record<number, string[]> = {
     Permissions.DRAWING_CREATE,
     Permissions.DRAWING_UPDATE,
     Permissions.DRAWING_DELETE,
+    Permissions.NETWORK_SYSTEM_READ,
+    Permissions.NETWORK_SYSTEM_CREATE,
+    Permissions.NETWORK_SYSTEM_UPDATE,
+    Permissions.NETWORK_SYSTEM_DELETE,
   ],
 };
 

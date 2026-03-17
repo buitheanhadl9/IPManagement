@@ -21,6 +21,8 @@ namespace IPManagement.API.Data
         public DbSet<UserUnitAssignment> UserUnitAssignments { get; set; }
         public DbSet<RolePermission> RolePermissions { get; set; }
         public DbSet<Drawing> Drawings { get; set; }
+        public DbSet<NetworkSystem> NetworkSystems { get; set; }
+        public DbSet<NetworkSystemIpAddress> NetworkSystemIpAddresses { get; set; }
 
         protected override void OnModelCreating(ModelBuilder builder)
         {
@@ -103,6 +105,39 @@ namespace IPManagement.API.Data
                 entity.HasOne(e => e.UpdatedByUser)
                       .WithMany(u => u.UpdatedDrawings)
                       .HasForeignKey(e => e.UpdatedBy)
+                      .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            // Configure NetworkSystem
+            builder.Entity<NetworkSystem>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.ExternalId).HasDefaultValueSql("gen_random_uuid()");
+                entity.HasOne(e => e.CreatedByUser)
+                      .WithMany(u => u.CreatedNetworkSystems)
+                      .HasForeignKey(e => e.CreatedBy)
+                      .OnDelete(DeleteBehavior.Restrict);
+                entity.HasOne(e => e.UpdatedByUser)
+                      .WithMany(u => u.UpdatedNetworkSystems)
+                      .HasForeignKey(e => e.UpdatedBy)
+                      .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            // Configure NetworkSystemIpAddress (join table for N-N relationship)
+            builder.Entity<NetworkSystemIpAddress>(entity =>
+            {
+                entity.HasKey(e => new { e.NetworkSystemId, e.IpAddressId });
+                entity.HasOne(e => e.NetworkSystem)
+                      .WithMany(n => n.IpAddresses)
+                      .HasForeignKey(e => e.NetworkSystemId)
+                      .OnDelete(DeleteBehavior.Cascade);
+                entity.HasOne(e => e.IpAddress)
+                      .WithMany(i => i.NetworkSystems)
+                      .HasForeignKey(e => e.IpAddressId)
+                      .OnDelete(DeleteBehavior.Cascade);
+                entity.HasOne(e => e.CreatedByUser)
+                      .WithMany(u => u.CreatedNetworkSystemIpAddresses)
+                      .HasForeignKey(e => e.CreatedBy)
                       .OnDelete(DeleteBehavior.Restrict);
             });
         }

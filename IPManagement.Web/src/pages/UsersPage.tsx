@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Table, Button, Modal, Form, Input, Select, message, Space, Popconfirm, Tag, Card, Row, Col, Typography, Breadcrumb, Checkbox, Switch, Divider, Pagination } from 'antd';
-import { PlusOutlined, EditOutlined, SearchOutlined, ReloadOutlined, PlusCircleOutlined, DeleteOutlined as DeleteCircleOutlined, LockOutlined, UserOutlined, MailOutlined, PhoneOutlined, EnvironmentOutlined, CalendarOutlined } from '@ant-design/icons';
+import { Table, Button, Modal, Form, Input, Select, message, Space, Popconfirm, Tag, Card, Row, Col, Typography, Breadcrumb, Checkbox, Switch, Divider, Pagination, Dropdown } from 'antd';
+import { PlusOutlined, EditOutlined, SearchOutlined, ReloadOutlined, PlusCircleOutlined, DeleteOutlined as DeleteCircleOutlined, LockOutlined, UserOutlined, MailOutlined, PhoneOutlined, EnvironmentOutlined, CalendarOutlined, ToolOutlined } from '@ant-design/icons';
 import type { User, UserCreateRequest, UserUpdateRequest, UserUnitAssignmentRequest } from '../types/user';
 import { userService } from '../services/user.service';
 import { unitService } from '../services/unit.service';
@@ -408,36 +408,45 @@ const UsersPage = () => {
       title: 'Actions',
       key: 'actions',
       align: 'center' as const,
-      width: 150,
+      width: 100,
       fixed: 'right' as const,
-      render: (_: unknown, record: User) => (
-        <Space>
-          {hasPermission(user, Permissions.USER_UPDATE) && (
-            <Button
-              icon={<LockOutlined />}
-              onClick={() => handleResetPassword(record.id)}
-              size="small"
-              title="Đổi mật khẩu"
-            >
-              Đổi MK
-            </Button>
-          )}
-          {canUpdateUser && (
-            <Button icon={<EditOutlined />} onClick={() => handleEdit(record)} size="small" />
-          )}
-          {canDeleteUser && (
-            <Popconfirm
-              title="Delete User"
-              description="Are you sure you want to delete this user?"
-              onConfirm={() => handleDelete(record.id)}
-              okText="Yes"
-              cancelText="No"
-            >
-              <Button icon={<DeleteCircleOutlined />} danger size="small" />
-            </Popconfirm>
-          )}
-        </Space>
-      ),
+      render: (_: unknown, record: User) => {
+        const items = [
+          {
+            key: 'resetPassword',
+            label: 'Đổi mật khẩu',
+            icon: <LockOutlined />,
+            onClick: () => handleResetPassword(record.id),
+            disabled: !hasPermission(user, Permissions.USER_UPDATE),
+          },
+          {
+            key: 'edit',
+            label: 'Sửa',
+            icon: <EditOutlined />,
+            onClick: () => handleEdit(record),
+            disabled: !canUpdateUser,
+          },
+          {
+            key: 'delete',
+            label: 'Xóa',
+            icon: <DeleteCircleOutlined />,
+            onClick: () => {
+              if (canDeleteUser) {
+                if (window.confirm('Bạn có chắc chắn muốn xóa user này?')) {
+                  handleDelete(record.id);
+                }
+              }
+            },
+            disabled: !canDeleteUser,
+          },
+        ];
+
+        return (
+          <Dropdown menu={{ items }} placement="bottomRight" trigger={['click']} getPopupContainer={(_trigger) => document.body}>
+            <Button icon={<ToolOutlined />} size="small" type="text" />
+          </Dropdown>
+        );
+      },
     },
   ];
 
@@ -504,36 +513,45 @@ const UsersPage = () => {
         
         <Col span={24}>
           <Divider style={{ margin: '8px 0' }} />
-          <Space>
-            {hasPermission(user, Permissions.USER_UPDATE) && (
-              <Button
-                icon={<LockOutlined />}
-                onClick={() => handleResetPassword(userData.id)}
-                size="small"
-                title="Đổi mật khẩu"
-              >
-                Đổi MK
-              </Button>
-            )}
-            {canUpdateUser && (
-              <Button icon={<EditOutlined />} onClick={() => handleEdit(userData)} size="small" type="primary">
-                Edit
-              </Button>
-            )}
-            {canDeleteUser && (
-              <Popconfirm
-                title="Delete User"
-                description="Are you sure you want to delete this user?"
-                onConfirm={() => handleDelete(userData.id)}
-                okText="Yes"
-                cancelText="No"
-              >
-                <Button icon={<DeleteCircleOutlined />} danger size="small">
-                  Delete
+          {(() => {
+            const items = [
+              {
+                key: 'resetPassword',
+                label: 'Đổi mật khẩu',
+                icon: <LockOutlined />,
+                onClick: () => handleResetPassword(userData.id),
+                disabled: !hasPermission(user, Permissions.USER_UPDATE),
+              },
+              {
+                key: 'edit',
+                label: 'Sửa',
+                icon: <EditOutlined />,
+                onClick: () => handleEdit(userData),
+                disabled: !canUpdateUser,
+              },
+              {
+                key: 'delete',
+                label: 'Xóa',
+                icon: <DeleteCircleOutlined />,
+                onClick: () => {
+                  if (canDeleteUser) {
+                    if (window.confirm('Bạn có chắc chắn muốn xóa user này?')) {
+                      handleDelete(userData.id);
+                    }
+                  }
+                },
+                disabled: !canDeleteUser,
+              },
+            ];
+
+            return (
+              <Dropdown menu={{ items }} placement="bottomRight" trigger={['click']} getPopupContainer={(_trigger) => document.body}>
+                <Button icon={<ToolOutlined />} size="small" type="text">
+                  Hành động
                 </Button>
-              </Popconfirm>
-            )}
-          </Space>
+              </Dropdown>
+            );
+          })()}
         </Col>
       </Row>
     </Card>

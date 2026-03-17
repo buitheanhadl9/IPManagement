@@ -16,6 +16,8 @@ import IPManagementPage from './pages/IPManagementPage';
 import UsersPage from './pages/UsersPage';
 import SettingsPage from './pages/SettingsPage';
 import RolesPage from './pages/RolesPage';
+import DrawingPage from './pages/DrawingPage';
+import NetworkSystemPage from './pages/NetworkSystemPage';
 
 function ActivityTracker() {
   useUserActivity();
@@ -58,20 +60,22 @@ function AppContent() {
       <SignalRConnector />
       <Routes>
         <Route path="/login" element={<LoginPage />} />
-        <Route
+          <Route
           path="*"
           element={
             <PrivateRoute>
               <MainLayout>
                   <Routes>
-                   <Route index element={<DashboardPage />} />
-                   <Route path="ip-management" element={<IPManagementPage />} />
-                   <Route path="units" element={<UnitsPage />} />
-                   <Route path="units/:id" element={<UnitDetailPage />} />
-                   <Route path="users" element={<UsersPage />} />
-                   <Route path="settings" element={<SettingsPage />} />
-                   <Route path="roles" element={<RolesPage />} />
-                 </Routes>
+                    <Route index element={<DashboardPage />} />
+                    <Route path="ip-management" element={<IPManagementPage />} />
+                    <Route path="units" element={<UnitsPage />} />
+                    <Route path="units/:id" element={<UnitDetailPage />} />
+                    <Route path="units/:id/drawings" element={<DrawingPage />} />
+                    <Route path="users" element={<UsersPage />} />
+                    <Route path="settings" element={<SettingsPage />} />
+                    <Route path="roles" element={<RolesPage />} />
+                    <Route path="network-systems" element={<NetworkSystemPage />} />
+                  </Routes>
               </MainLayout>
             </PrivateRoute>
           }

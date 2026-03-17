@@ -54,10 +54,10 @@ namespace IPManagement.API.Controllers
         [HttpPost("upload")]
         [RequirePermission(FunctionCode.DRAWING, CommandCode.CREATE)]
         public async Task<ActionResult<DrawingDto>> UploadDrawing(
-            [FromForm] long unitId,
-            [FromForm] IFormFile file,
-            [FromForm] string? version,
-            [FromForm] string? description)
+            long unitId,
+            IFormFile file,
+            string? version,
+            string? description)
         {
             var userId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value!);
             
@@ -114,7 +114,7 @@ namespace IPManagement.API.Controllers
 
         [HttpPost("{drawingId}/file")]
         [RequirePermission(FunctionCode.DRAWING, CommandCode.UPDATE)]
-        public async Task<ActionResult<DrawingDto>> UpdateDrawingFile(long drawingId, [FromForm] IFormFile file, [FromForm] string? version)
+        public async Task<ActionResult<DrawingDto>> UpdateDrawingFile(long drawingId, IFormFile file, string? version)
         {
             var userId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value!);
             try

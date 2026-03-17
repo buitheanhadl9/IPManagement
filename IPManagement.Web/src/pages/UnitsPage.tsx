@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Table, Button, Modal, Form, Input, Select, message, Space, Popconfirm, Tag, Card, Row, Col, Typography } from 'antd';
-import { PlusOutlined, EditOutlined, DeleteOutlined, SearchOutlined, EnvironmentOutlined, WifiOutlined } from '@ant-design/icons';
+import { Table, Button, Modal, Form, Input, Select, message, Space, Popconfirm, Tag, Card, Row, Col, Typography, Dropdown } from 'antd';
+import { PlusOutlined, EditOutlined, DeleteOutlined, SearchOutlined, EnvironmentOutlined, WifiOutlined, FolderOpenOutlined, ToolOutlined } from '@ant-design/icons';
 import type { Unit, UnitCreateRequest, UnitUpdateRequest } from '../types/unit';
 import { unitService } from '../services/unit.service';
 import { useNavigate } from 'react-router-dom';
@@ -167,6 +167,10 @@ const UnitsPage = () => {
     navigate(`/units/${unitId}?name=${encodeURIComponent(unitName)}`);
   };
 
+  const handleViewDrawings = (unitId: number, unitName: string) => {
+    navigate(`/units/${unitId}/drawings?name=${encodeURIComponent(unitName)}`);
+  };
+
   const columns = [
     {
       title: 'Tên đơn vị',
@@ -215,33 +219,56 @@ const UnitsPage = () => {
       ),
     },
     {
-      title: 'Actions',
+      title: 'Quản lý bản vẽ',
+      key: 'drawings',
+      align: 'center' as const,
+      width: 120,
+      render: (_: unknown, record: Unit) => (
+        <Button
+          icon={<FolderOpenOutlined />}
+          onClick={() => handleViewDrawings(record.id, record.name)}
+          size="small"
+          type="link"
+        >
+          Bản vẽ
+        </Button>
+      ),
+    },
+    {
+      title: 'Hành động',
       key: 'actions',
       align: 'center' as const,
-      width: 150,
-      render: (_: unknown, record: Unit) => (
-        <Space>
-          {canUpdateUnit && (
-            <Button
-              icon={<EditOutlined />}
-              onClick={() => handleEdit(record)}
-              size="small"
-              type="primary"
-            />
-          )}
-          {canDeleteUnit && (
-            <Popconfirm
-              title="Delete Unit"
-              description="Are you sure you want to delete this unit?"
-              onConfirm={() => handleDelete(record.id)}
-              okText="Yes"
-              cancelText="No"
-            >
-              <Button icon={<DeleteOutlined />} danger size="small" />
-            </Popconfirm>
-          )}
-        </Space>
-      ),
+      width: 100,
+      render: (_: unknown, record: Unit) => {
+        const items = [
+          {
+            key: 'edit',
+            label: 'Sửa',
+            icon: <EditOutlined />,
+            onClick: () => handleEdit(record),
+            disabled: !canUpdateUnit,
+          },
+          {
+            key: 'delete',
+            label: 'Xóa',
+            icon: <DeleteOutlined />,
+            onClick: () => {
+              if (canDeleteUnit) {
+                if (window.confirm('Bạn có chắc chắn muốn xóa đơn vị này?')) {
+                  handleDelete(record.id);
+                }
+              }
+            },
+            disabled: !canDeleteUnit,
+          },
+        ];
+
+        return (
+          <Dropdown menu={{ items }} placement="bottomRight" trigger={['click']} getPopupContainer={(_trigger) => document.body}>
+            <Button icon={<ToolOutlined />} size="small" type="text" />
+          </Dropdown>
+        );
+      },
     },
   ];
 
@@ -289,24 +316,41 @@ const UnitsPage = () => {
               <Button icon={<WifiOutlined />} onClick={() => handleViewIPs(unit.id, unit.name)} size="small">
                 View IPs
               </Button>
-              {canUpdateUnit && (
-                <Button icon={<EditOutlined />} onClick={() => handleEdit(unit)} size="small" type="primary">
-                  Edit
-                </Button>
-              )}
-              {canDeleteUnit && (
-                <Popconfirm
-                  title="Delete Unit"
-                  description="Are you sure you want to delete this unit?"
-                  onConfirm={() => handleDelete(unit.id)}
-                  okText="Yes"
-                  cancelText="No"
-                >
-                  <Button icon={<DeleteOutlined />} danger size="small">
-                    Delete
-                  </Button>
-                </Popconfirm>
-              )}
+              <Button icon={<FolderOpenOutlined />} onClick={() => handleViewDrawings(unit.id, unit.name)} size="small">
+                Bản vẽ
+              </Button>
+              {(() => {
+                const items = [
+                  {
+                    key: 'edit',
+                    label: 'Sửa',
+                    icon: <EditOutlined />,
+                    onClick: () => handleEdit(unit),
+                    disabled: !canUpdateUnit,
+                  },
+                  {
+                    key: 'delete',
+                    label: 'Xóa',
+                    icon: <DeleteOutlined />,
+                    onClick: () => {
+                      if (canDeleteUnit) {
+                        if (window.confirm('Bạn có chắc chắn muốn xóa đơn vị này?')) {
+                          handleDelete(unit.id);
+                        }
+                      }
+                    },
+                    disabled: !canDeleteUnit,
+                  },
+                ];
+
+                return (
+                  <Dropdown menu={{ items }} placement="bottomRight" trigger={['click']} getPopupContainer={(_trigger) => document.body}>
+                    <Button icon={<ToolOutlined />} size="small" type="text">
+                      Hành động
+                    </Button>
+                  </Dropdown>
+                );
+              })()}
             </Space>
           </Col>
         </Row>

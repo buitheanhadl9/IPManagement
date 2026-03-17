@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Table, Button, Input, Space, Tag, message, Card, Breadcrumb, Typography, Popconfirm, Select, Modal, Form, Divider, Row, Col } from 'antd';
-import { PlusOutlined, EditOutlined, DeleteOutlined, SearchOutlined, ReloadOutlined, WifiOutlined, BarcodeOutlined, DesktopOutlined, EnvironmentOutlined, LaptopOutlined } from '@ant-design/icons';
+import { Table, Button, Input, Space, Tag, message, Card, Breadcrumb, Typography, Popconfirm, Select, Modal, Form, Divider, Row, Col, Dropdown } from 'antd';
+import { PlusOutlined, EditOutlined, DeleteOutlined, SearchOutlined, ReloadOutlined, WifiOutlined, BarcodeOutlined, DesktopOutlined, EnvironmentOutlined, LaptopOutlined, ToolOutlined } from '@ant-design/icons';
 import type { IPAddress, IPAddressCreateRequest, IPAddressUpdateRequest } from '../types/ip';
 import { ipService } from '../services/ip.service';
 import { unitService } from '../services/unit.service';
@@ -9,6 +9,8 @@ import { format } from 'date-fns';
 import { useAppSelector } from '../hooks/useAppSelector';
 import { hasPermission, Permissions } from '../utils/permissions';
 import TruncatedDescription from '../components/TruncatedDescription';
+import type { NetworkSystem } from '../types/networkSystem';
+import { networkSystemService } from '../services/networkSystem.service';
 
 const { Title } = Typography;
 const { Search } = Input;
@@ -27,6 +29,8 @@ const IPManagementPage = () => {
   const [statusFilter, setStatusFilter] = useState<string>('');
   const [unitIdFilter, setUnitIdFilter] = useState<number | null>(null);
   const [units, setUnits] = useState<{ id: number; name: string }[]>([]);
+  const [networkSystems, setNetworkSystems] = useState<NetworkSystem[]>([]);
+  const [networkSystemsLoading, setNetworkSystemsLoading] = useState(false);
   
   // Check permissions (dùng Unified Roles - level cao nhất trong units áp dụng toàn hệ thống)
   // Chỉ check permission khi đã load xong user
@@ -74,22 +78,36 @@ const IPManagementPage = () => {
     }
   };
 
-  const handleAdd = () => {
+  const fetchNetworkSystems = async () => {
+    setNetworkSystemsLoading(true);
+    try {
+      const response = await networkSystemService.getNetworkSystems(1, 100, undefined, 'Active');
+      setNetworkSystems(response.items);
+    } catch (error) {
+      console.error('Failed to fetch network systems:', error);
+    } finally {
+      setNetworkSystemsLoading(false);
+    }
+  };
+
+  const handleAdd = async () => {
     if (!canCreateIP) {
       message.error('Bạn không có quyền thêm IP Address');
       return;
     }
     setEditingId(null);
     form.resetFields();
+    await fetchNetworkSystems();
     setModalVisible(true);
   };
 
-  const handleEdit = (record: IPAddress) => {
+  const handleEdit = async (record: IPAddress) => {
     if (!canUpdateIP) {
       message.error('Bạn không có quyền sửa IP Address');
       return;
     }
     setEditingId(record.id);
+    await fetchNetworkSystems();
     form.setFieldsValue({
       ipAddress: record.ipAddress,
       macAddress: record.macAddress,
@@ -99,6 +117,7 @@ const IPManagementPage = () => {
       unitId: record.unitId,
       status: record.status,
       description: record.description,
+      networkSystemId: record.networkSystemId,
     });
     setModalVisible(true);
   };
@@ -192,6 +211,14 @@ const IPManagementPage = () => {
       resizable: true,
     },
     {
+      title: 'Hệ thống mạng',
+      dataIndex: 'networkSystemName',
+      key: 'networkSystemName',
+      width: 150,
+      render: (name: string | undefined) => name ? <Tag color="blue">{name}</Tag> : '-',
+      resizable: true,
+    },
+    {
       title: 'Description',
       dataIndex: 'description',
       key: 'description',
@@ -215,30 +242,34 @@ const IPManagementPage = () => {
       fixed: 'right' as const,
       resizable: false,
       render: (_: unknown, record: IPAddress) => {
-        const actions = [];
-        
-        if (canUpdateIP) {
-          actions.push(
-            <Button key="edit" icon={<EditOutlined />} onClick={() => handleEdit(record)} size="small" />
-          );
-        }
-        
-        if (canDeleteIP) {
-          actions.push(
-            <Popconfirm
-              key="delete"
-              title="Xóa IP Address"
-              description="Bạn có chắc muốn xóa IP này?"
-              onConfirm={() => handleDelete(record.id)}
-              okText="Yes"
-              cancelText="No"
-            >
-              <Button icon={<DeleteOutlined />} danger size="small" />
-            </Popconfirm>
-          );
-        }
-        
-        return <Space>{actions}</Space>;
+        const items = [
+          {
+            key: 'edit',
+            label: 'Sửa',
+            icon: <EditOutlined />,
+            onClick: () => handleEdit(record),
+            disabled: !canUpdateIP,
+          },
+          {
+            key: 'delete',
+            label: 'Xóa',
+            icon: <DeleteOutlined />,
+            onClick: () => {
+              if (canDeleteIP) {
+                if (window.confirm('Bạn có chắc chắn muốn xóa IP address này?')) {
+                  handleDelete(record.id);
+                }
+              }
+            },
+            disabled: !canDeleteIP,
+          },
+        ];
+
+        return (
+          <Dropdown menu={{ items }} placement="bottomRight" trigger={['click']} getPopupContainer={(_trigger) => document.body}>
+            <Button icon={<ToolOutlined />} size="small" type="text" />
+          </Dropdown>
+        );
       },
     },
   ];
@@ -279,6 +310,11 @@ const IPManagementPage = () => {
                 <EnvironmentOutlined style={{ color: '#666', minWidth: 20 }} />
                 <span>Unit: {ip.unitName || '-'}</span>
               </Space>
+              {ip.networkSystemName && (
+                <Space>
+                  <span>System: <Tag color="blue">{ip.networkSystemName}</Tag></span>
+                </Space>
+              )}
               {ip.port && (
                 <Space>
                   <span>Port: {ip.port}</span>
@@ -294,26 +330,38 @@ const IPManagementPage = () => {
           
           <Col span={24}>
             <Divider style={{ margin: '8px 0' }} />
-            <Space>
-              {canUpdateIP && (
-                <Button icon={<EditOutlined />} onClick={() => handleEdit(ip)} size="small" type="primary">
-                  Edit
-                </Button>
-              )}
-              {canDeleteIP && (
-                <Popconfirm
-                  title="Xóa IP Address"
-                  description="Bạn có chắc muốn xóa IP này?"
-                  onConfirm={() => handleDelete(ip.id)}
-                  okText="Yes"
-                  cancelText="No"
-                >
-                  <Button icon={<DeleteOutlined />} danger size="small">
-                    Delete
+            {(() => {
+              const items = [
+                {
+                  key: 'edit',
+                  label: 'Sửa',
+                  icon: <EditOutlined />,
+                  onClick: () => handleEdit(ip),
+                  disabled: !canUpdateIP,
+                },
+                {
+                  key: 'delete',
+                  label: 'Xóa',
+                  icon: <DeleteOutlined />,
+                  onClick: () => {
+                    if (canDeleteIP) {
+                      if (window.confirm('Bạn có chắc chắn muốn xóa IP address này?')) {
+                        handleDelete(ip.id);
+                      }
+                    }
+                  },
+                  disabled: !canDeleteIP,
+                },
+              ];
+
+              return (
+                <Dropdown menu={{ items }} placement="bottomRight" trigger={['click']} getPopupContainer={(_trigger) => document.body}>
+                  <Button icon={<ToolOutlined />} size="small" type="text">
+                    Hành động
                   </Button>
-                </Popconfirm>
-              )}
-            </Space>
+                </Dropdown>
+              );
+            })()}
           </Col>
         </Row>
       </Card>
@@ -529,6 +577,23 @@ const IPManagementPage = () => {
             label="Port"
           >
             <Input placeholder="e.g., 8080" />
+          </Form.Item>
+
+          <Form.Item
+            name="networkSystemId"
+            label="Hệ thống mạng"
+          >
+            <Select 
+              placeholder="Chọn hệ thống mạng (tùy chọn)" 
+              allowClear
+              loading={networkSystemsLoading}
+            >
+              {networkSystems.map((ns) => (
+                <Select.Option key={ns.id} value={ns.id}>
+                  {ns.name}
+                </Select.Option>
+              ))}
+            </Select>
           </Form.Item>
 
           <Form.Item

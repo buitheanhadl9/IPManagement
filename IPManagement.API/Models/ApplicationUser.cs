@@ -35,5 +35,11 @@ namespace IPManagement.API.Models
         public ICollection<Drawing> CreatedDrawings { get; set; } = new List<Drawing>();
         
         public ICollection<Drawing> UpdatedDrawings { get; set; } = new List<Drawing>();
+        
+        public ICollection<NetworkSystem> CreatedNetworkSystems { get; set; } = new List<NetworkSystem>();
+        
+        public ICollection<NetworkSystem> UpdatedNetworkSystems { get; set; } = new List<NetworkSystem>();
+        
+        public ICollection<NetworkSystemIpAddress> CreatedNetworkSystemIpAddresses { get; set; } = new List<NetworkSystemIpAddress>();
     }
 }

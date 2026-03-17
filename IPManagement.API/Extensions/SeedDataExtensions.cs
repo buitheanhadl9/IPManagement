@@ -56,7 +56,12 @@ public static class SeedDataExtensions
             PermissionHelper.GetPermission(FunctionCode.DRAWING, CommandCode.VIEW),
             PermissionHelper.GetPermission(FunctionCode.DRAWING, CommandCode.CREATE),
             PermissionHelper.GetPermission(FunctionCode.DRAWING, CommandCode.UPDATE),
-            PermissionHelper.GetPermission(FunctionCode.DRAWING, CommandCode.DELETE)
+            PermissionHelper.GetPermission(FunctionCode.DRAWING, CommandCode.DELETE),
+            // Network System - full access
+            PermissionHelper.GetPermission(FunctionCode.NETWORK_SYSTEM, CommandCode.VIEW),
+            PermissionHelper.GetPermission(FunctionCode.NETWORK_SYSTEM, CommandCode.CREATE),
+            PermissionHelper.GetPermission(FunctionCode.NETWORK_SYSTEM, CommandCode.UPDATE),
+            PermissionHelper.GetPermission(FunctionCode.NETWORK_SYSTEM, CommandCode.DELETE)
         };
 
         foreach (var permission in managerPermissions)
@@ -85,7 +90,12 @@ public static class SeedDataExtensions
             PermissionHelper.GetPermission(FunctionCode.DRAWING, CommandCode.VIEW),
             PermissionHelper.GetPermission(FunctionCode.DRAWING, CommandCode.CREATE),
             PermissionHelper.GetPermission(FunctionCode.DRAWING, CommandCode.UPDATE),
-            PermissionHelper.GetPermission(FunctionCode.DRAWING, CommandCode.DELETE)
+            PermissionHelper.GetPermission(FunctionCode.DRAWING, CommandCode.DELETE),
+            // Network System - full access
+            PermissionHelper.GetPermission(FunctionCode.NETWORK_SYSTEM, CommandCode.VIEW),
+            PermissionHelper.GetPermission(FunctionCode.NETWORK_SYSTEM, CommandCode.CREATE),
+            PermissionHelper.GetPermission(FunctionCode.NETWORK_SYSTEM, CommandCode.UPDATE),
+            PermissionHelper.GetPermission(FunctionCode.NETWORK_SYSTEM, CommandCode.DELETE)
         };
 
         foreach (var permission in userPermissions)
@@ -284,141 +294,6 @@ public static class SeedDataExtensions
 
                     await context.SaveChangesAsync();
                     logger.LogInformation("Created sample IP addresses");
-                }
-
-                // Seed sample drawings
-                if (!context.Drawings.Any())
-                {
-                    var itUnit = await context.Units.FirstOrDefaultAsync(u => u.Name == "IT Department");
-                    var hrUnit = await context.Units.FirstOrDefaultAsync(u => u.Name == "HR Department");
-                    var financeUnit = await context.Units.FirstOrDefaultAsync(u => u.Name == "Finance Department");
-                    var opsUnit = await context.Units.FirstOrDefaultAsync(u => u.Name == "Operations");
-
-                    var seedingAdminUser = await userManager.FindByEmailAsync("admin@ipmanagement.com");
-                    var createdBy = seedingAdminUser?.Id ?? string.Empty;
-
-                    if (itUnit != null)
-                    {
-                        var drawings = new List<Drawing>
-                        {
-                            new Drawing
-                            {
-                                UnitId = itUnit.Id,
-                                FileName = "Network-Topology-2024.pdf",
-                                FilePath = "uploads/drawings/network-topology-2024.pdf",
-                                FileType = "PDF",
-                                FileSize = 2548000,
-                                Version = "1.0",
-                                Description = "Mô tả kiến trúc mạng tổng thể cho phòng IT",
-                                CreatedBy = createdBy,
-                                CreatedAt = DateTime.UtcNow
-                            },
-                            new Drawing
-                            {
-                                UnitId = itUnit.Id,
-                                FileName = "Server-Room-Layout.pdf",
-                                FilePath = "uploads/drawings/server-room-layout.pdf",
-                                FileType = "PDF",
-                                FileSize = 1856000,
-                                Version = "2.0",
-                                Description = "Bản vẽ bố trí server room",
-                                CreatedBy = createdBy,
-                                CreatedAt = DateTime.UtcNow
-                            },
-                            new Drawing
-                            {
-                                UnitId = itUnit.Id,
-                                FileName = "Cabling-Diagram.dwg",
-                                FilePath = "uploads/drawings/cabling-diagram.dwg",
-                                FileType = "DWG",
-                                FileSize = 3245000,
-                                Version = "1.5",
-                                Description = "Sơ đồ dây mạng chi tiết",
-                                CreatedBy = createdBy,
-                                CreatedAt = DateTime.UtcNow
-                            }
-                        };
-
-                        context.Drawings.AddRange(drawings);
-                    }
-
-                    if (hrUnit != null)
-                    {
-                        var hrDrawings = new List<Drawing>
-                        {
-                            new Drawing
-                            {
-                                UnitId = hrUnit.Id,
-                                FileName = "HR-Office-Floor-Plan.pdf",
-                                FilePath = "uploads/drawings/hr-office-floor-plan.pdf",
-                                FileType = "PDF",
-                                FileSize = 1245000,
-                                Version = "1.0",
-                                Description = "Bản vẽ mặt bằng văn phòng HR",
-                                CreatedBy = createdBy,
-                                CreatedAt = DateTime.UtcNow
-                            }
-                        };
-
-                        context.Drawings.AddRange(hrDrawings);
-                    }
-
-                    if (financeUnit != null)
-                    {
-                        var financeDrawings = new List<Drawing>
-                        {
-                            new Drawing
-                            {
-                                UnitId = financeUnit.Id,
-                                FileName = "Finance-Network-Schema.pdf",
-                                FilePath = "uploads/drawings/finance-network-schema.pdf",
-                                FileType = "PDF",
-                                FileSize = 985000,
-                                Version = "1.0",
-                                Description = "Sơ đồ mạng phòng Tài chính",
-                                CreatedBy = createdBy,
-                                CreatedAt = DateTime.UtcNow
-                            }
-                        };
-
-                        context.Drawings.AddRange(financeDrawings);
-                    }
-
-                    if (opsUnit != null)
-                    {
-                        var opsDrawings = new List<Drawing>
-                        {
-                            new Drawing
-                            {
-                                UnitId = opsUnit.Id,
-                                FileName = "Operations-Infrastructure.pdf",
-                                FilePath = "uploads/drawings/operations-infrastructure.pdf",
-                                FileType = "PDF",
-                                FileSize = 2156000,
-                                Version = "1.0",
-                                Description = "Cơ sở hạ tầng phòng Operations",
-                                CreatedBy = createdBy,
-                                CreatedAt = DateTime.UtcNow
-                            },
-                            new Drawing
-                            {
-                                UnitId = opsUnit.Id,
-                                FileName = "Ops-Workstation-Layout.png",
-                                FilePath = "uploads/drawings/ops-workstation-layout.png",
-                                FileType = "PNG",
-                                FileSize = 1548000,
-                                Version = "1.0",
-                                Description = "Bố trí workstation cho Operations",
-                                CreatedBy = createdBy,
-                                CreatedAt = DateTime.UtcNow
-                            }
-                        };
-
-                        context.Drawings.AddRange(opsDrawings);
-                    }
-
-                    await context.SaveChangesAsync();
-                    logger.LogInformation("Created sample drawings for all units");
                 }
 
                 logger.LogInformation("Data seeding completed successfully");

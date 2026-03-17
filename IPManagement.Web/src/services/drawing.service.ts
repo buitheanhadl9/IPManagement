@@ -1,5 +1,5 @@
 import api from './api';
-import type { Drawing, DrawingUploadRequest, DrawingUpdateRequest } from '../types/drawing';
+import type { Drawing, DrawingUpdateRequest } from '../types/drawing';
 
 export const drawingService = {
   // Lấy danh sách bản vẽ của đơn vị
@@ -8,9 +8,9 @@ export const drawingService = {
     return response.data;
   },
 
-  // Upload bản vẽ mới
-  uploadDrawing: async (data: FormData): Promise<Drawing> => {
-    const response = await api.post<Drawing>('/drawings/upload', data, {
+  // Upload bản vẽ mới (với unitId trong URL)
+  uploadDrawingWithUnitId: async (unitId: number, data: FormData): Promise<Drawing> => {
+    const response = await api.post<Drawing>(`/drawings/upload?unitId=${unitId}`, data, {
       headers: { 'Content-Type': undefined }
     });
     return response.data;
@@ -52,9 +52,11 @@ export const drawingService = {
     window.URL.revokeObjectURL(url);
   },
 
-  // Lấy URL preview
-  getPreviewUrl: async (id: number): Promise<string> => {
-    const response = await api.get(`/drawings/${id}/preview`);
-    return response.data.previewUrl;
+  // Preview drawing (lấy file blob)
+  previewDrawing: async (id: number): Promise<Blob> => {
+    const response = await api.get(`/drawings/${id}/preview`, {
+      responseType: 'blob'
+    });
+    return response.data;
   }
 };

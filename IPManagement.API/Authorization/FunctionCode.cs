@@ -12,6 +12,7 @@ namespace IPManagement.API.Authorization
         AUDIT_LOG,       // Xem nhật ký audit
         REPORT,          // Báo cáo
         SETTINGS,        // Cài đặt hệ thống
-        DRAWING          // Quản lý bản vẽ
+        DRAWING,         // Quản lý bản vẽ
+        NETWORK_SYSTEM   // Quản lý hệ thống mạng
     }
 }

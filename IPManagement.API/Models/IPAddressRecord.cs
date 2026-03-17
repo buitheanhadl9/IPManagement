@@ -50,5 +50,8 @@ namespace IPManagement.API.Models
         public bool IsOnline { get; set; } = false;
         
         public DateTime? LastPingTime { get; set; }
+        
+        // Many-to-many relationship with NetworkSystems
+        public ICollection<NetworkSystemIpAddress> NetworkSystems { get; set; } = new List<NetworkSystemIpAddress>();
     }
 }

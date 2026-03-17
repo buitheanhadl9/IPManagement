@@ -14,6 +14,8 @@ export interface IPAddress {
   updatedAt?: string;
   isOnline: boolean;
   lastPingTime?: string;
+  networkSystemId?: number;
+  networkSystemName?: string;
 }
 
 export interface IPAddressCreateRequest {
@@ -25,6 +27,7 @@ export interface IPAddressCreateRequest {
   description?: string;
   status?: string;
   unitId?: number;
+  networkSystemId?: number;
 }
 
 export interface IPAddressUpdateRequest {
@@ -36,6 +39,7 @@ export interface IPAddressUpdateRequest {
   description?: string;
   status?: string;
   unitId?: number;
+  networkSystemId?: number;
 }
 
 export interface IPAddressListResponse {

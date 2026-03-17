@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { Table, Button, Modal, Form, Input, Select, message, Space, Popconfirm, Card, Row, Col, Typography, Tag, Breadcrumb } from 'antd';
-import { PlusOutlined, EditOutlined, DeleteOutlined, ArrowLeftOutlined, WifiOutlined } from '@ant-design/icons';
+import { Table, Button, Modal, Form, Input, Select, message, Space, Popconfirm, Card, Row, Col, Typography, Tag, Breadcrumb, Dropdown, Input as AntInput } from 'antd';
+import { PlusOutlined, EditOutlined, DeleteOutlined, ArrowLeftOutlined, WifiOutlined, MoreOutlined, ToolOutlined, SearchOutlined } from '@ant-design/icons';
 import type { IPAddress, IPAddressCreateRequest, IPAddressUpdateRequest } from '../types/ip';
 import { ipService } from '../services/ip.service';
 import { unitService } from '../services/unit.service';
@@ -11,7 +11,8 @@ import { hasPermission, Permissions, isAssignedToUnit, isAdmin } from '../utils/
 import { signalRService } from '../services/signalr.service';
 import type { UnitUpdateNotification, PermissionUpdateNotification } from '../types/notification';
 import TruncatedDescription from '../components/TruncatedDescription';
-import DrawingManagement from '../components/DrawingManagement';
+import type { NetworkSystem } from '../types/networkSystem';
+import { networkSystemService } from '../services/networkSystem.service';
 
 const { Title } = Typography;
 
@@ -31,6 +32,10 @@ const UnitDetailPage = () => {
   const [form] = Form.useForm();
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [checkingAccess, setCheckingAccess] = useState(true);
+  const [searchKeyword, setSearchKeyword] = useState('');
+  const [deviceTypeFilter, setDeviceTypeFilter] = useState<string | undefined>(undefined);
+  const [networkSystems, setNetworkSystems] = useState<NetworkSystem[]>([]);
+  const [networkSystemsLoading, setNetworkSystemsLoading] = useState(false);
 
   // Check permissions - use useMemo to re-calculate when user changes
   // Chỉ check permission khi đã load xong user
@@ -43,7 +48,6 @@ const UnitDetailPage = () => {
   const canCreateDrawing = useMemo(() => user ? hasPermission(user, Permissions.DRAWING_CREATE) : false, [user]);
   const canUpdateDrawing = useMemo(() => user ? hasPermission(user, Permissions.DRAWING_UPDATE) : false, [user]);
   const canDeleteDrawing = useMemo(() => user ? hasPermission(user, Permissions.DRAWING_DELETE) : false, [user]);
-  const canReadDrawing = useMemo(() => user ? hasPermission(user, Permissions.DRAWING_READ) : false, [user]);
 
   // Handle window resize for responsive design
   useEffect(() => {
@@ -65,7 +69,23 @@ const UnitDetailPage = () => {
     // User thường cần có quyền IP_READ VÀ được gán vào đơn vị
     return canReadIP && isAssignedToUnit(user, parseInt(id));
   }, [user, id, canReadIP, isAuthenticated]);
-  
+
+  // Debug log for permissions
+  useEffect(() => {
+    if (user) {
+      console.log('[UnitDetailPage] Debug permissions:', {
+        username: user.username,
+        roles: user.roles,
+        permissions: user.permissions,
+        canCreateDrawing,
+        canUpdateDrawing,
+        canDeleteDrawing,
+        hasUnitAccess,
+        isAdmin: isAdmin(user)
+      });
+    }
+  }, [user, canCreateDrawing, canUpdateDrawing, canDeleteDrawing, hasUnitAccess]);
+
   useEffect(() => {
     // Đợi user được load xong trước khi kiểm tra quyền
     if (!isAuthenticated) {
@@ -146,7 +166,20 @@ const UnitDetailPage = () => {
     }
   };
 
-  const handleAdd = () => {
+  const fetchNetworkSystems = async () => {
+    setNetworkSystemsLoading(true);
+    try {
+      const response = await networkSystemService.getNetworkSystems(1, 100, undefined, 'Active');
+      setNetworkSystems(response.items);
+    } catch (error) {
+      console.error('Failed to fetch network systems:', error);
+      // Không hiển thị lỗi, chỉ để danh sách rỗng
+    } finally {
+      setNetworkSystemsLoading(false);
+    }
+  };
+
+  const handleAdd = async () => {
     if (!canCreateIP) {
       message.error('Bạn không có quyền thêm IP');
       return;
@@ -156,15 +189,17 @@ const UnitDetailPage = () => {
     if (id) {
       form.setFieldsValue({ unitId: parseInt(id) });
     }
+    await fetchNetworkSystems();
     setModalVisible(true);
   };
 
-  const handleEdit = (record: IPAddress) => {
+  const handleEdit = async (record: IPAddress) => {
     if (!canUpdateIP) {
       message.error('Bạn không có quyền chỉnh sửa IP');
       return;
     }
     setEditingId(record.id);
+    await fetchNetworkSystems();
     form.setFieldsValue({
       ipAddress: record.ipAddress,
       macAddress: record.macAddress,
@@ -174,6 +209,7 @@ const UnitDetailPage = () => {
       unitId: record.unitId,
       status: record.status,
       description: record.description,
+      networkSystemId: record.networkSystemId,
     });
     setModalVisible(true);
   };
@@ -243,6 +279,25 @@ const UnitDetailPage = () => {
     }
   };
 
+  // Filter IP addresses based on search keyword and device type filter
+  const filteredIPAddresses = useMemo(() => {
+    return ipAddresses.filter((ip) => {
+      // Filter by keyword
+      const matchesKeyword =
+        !searchKeyword ||
+        ip.ipAddress.toLowerCase().includes(searchKeyword.toLowerCase()) ||
+        ip.macAddress?.toLowerCase().includes(searchKeyword.toLowerCase()) ||
+        ip.deviceName?.toLowerCase().includes(searchKeyword.toLowerCase()) ||
+        ip.port?.toLowerCase().includes(searchKeyword.toLowerCase()) ||
+        ip.description?.toLowerCase().includes(searchKeyword.toLowerCase());
+
+      // Filter by device type
+      const matchesDeviceType = !deviceTypeFilter || ip.deviceType === deviceTypeFilter;
+
+      return matchesKeyword && matchesDeviceType;
+    });
+  }, [ipAddresses, searchKeyword, deviceTypeFilter]);
+
   const columns = [
     {
       title: 'IP Address',
@@ -256,13 +311,13 @@ const UnitDetailPage = () => {
       render: (mac: string | undefined) => mac || '-',
     },
     {
-      title: 'Device Name',
+      title: 'Tên thiết bị',
       dataIndex: 'deviceName',
       key: 'deviceName',
       render: (name: string | undefined) => name || '-',
     },
     {
-      title: 'Device Type',
+      title: 'Loại thiết bị',
       dataIndex: 'deviceType',
       key: 'deviceType',
       render: (type: string | undefined) => type || '-',
@@ -274,35 +329,53 @@ const UnitDetailPage = () => {
       render: (port: string | undefined) => port || '-',
     },
     {
-      title: 'Description',
+      title: 'Hệ thống mạng',
+      dataIndex: 'networkSystemName',
+      key: 'networkSystemName',
+      render: (name: string | undefined) => name ? <Tag color="blue">{name}</Tag> : '-',
+    },
+    {
+      title: 'Mô tả',
       dataIndex: 'description',
       key: 'description',
       width: 200,
       render: (desc: string | undefined) => <TruncatedDescription description={desc} />,
     },
     {
-      title: 'Actions',
+      title: 'Hành động',
       key: 'actions',
       align: 'center' as const,
       width: 100,
-      render: (_: unknown, record: IPAddress) => (
-        <Space>
-          {canUpdateIP && (
-            <Button icon={<EditOutlined />} onClick={() => handleEdit(record)} size="small" type="primary" />
-          )}
-          {canDeleteIP && (
-            <Popconfirm
-              title="Delete IP Address"
-              description="Are you sure you want to delete this IP?"
-              onConfirm={() => handleDelete(record.id)}
-              okText="Yes"
-              cancelText="No"
-            >
-              <Button icon={<DeleteOutlined />} danger size="small" />
-            </Popconfirm>
-          )}
-        </Space>
-      ),
+      render: (_: unknown, record: IPAddress) => {
+        const items = [
+          {
+            key: 'edit',
+            label: 'Sửa',
+            icon: <EditOutlined />,
+            onClick: () => handleEdit(record),
+            disabled: !canUpdateIP,
+          },
+          {
+            key: 'delete',
+            label: 'Xóa',
+            icon: <DeleteOutlined />,
+            onClick: () => {
+              if (canDeleteIP) {
+                if (window.confirm('Bạn có chắc chắn muốn xóa IP address này?')) {
+                  handleDelete(record.id);
+                }
+              }
+            },
+            disabled: !canDeleteIP,
+          },
+        ];
+
+        return (
+          <Dropdown menu={{ items }} placement="bottomRight" trigger={['click']} getPopupContainer={(_trigger) => document.body}>
+            <Button icon={<ToolOutlined />} size="small" type="text" />
+          </Dropdown>
+        );
+      },
     },
   ];
 
@@ -338,6 +411,11 @@ const UnitDetailPage = () => {
               <Space>
                 <strong>Port:</strong> <span>{ip.port || '-'}</span>
               </Space>
+              {ip.networkSystemName && (
+                <Space>
+                  <strong>System:</strong> <Tag color="blue">{ip.networkSystemName}</Tag>
+                </Space>
+              )}
               {ip.description && (
                 <Space>
                   <strong>Note:</strong> <span style={{ color: '#666' }}>{ip.description}</span>
@@ -347,26 +425,38 @@ const UnitDetailPage = () => {
           </Col>
           
           <Col span={24}>
-            <Space wrap>
-              {canUpdateIP && (
-                <Button icon={<EditOutlined />} onClick={() => handleEdit(ip)} size="small" type="primary">
-                  Edit
-                </Button>
-              )}
-              {canDeleteIP && (
-                <Popconfirm
-                  title="Delete IP Address"
-                  description="Are you sure you want to delete this IP?"
-                  onConfirm={() => handleDelete(ip.id)}
-                  okText="Yes"
-                  cancelText="No"
-                >
-                  <Button icon={<DeleteOutlined />} danger size="small">
-                    Delete
+            {(() => {
+              const items = [
+                {
+                  key: 'edit',
+                  label: 'Sửa',
+                  icon: <EditOutlined />,
+                  onClick: () => handleEdit(ip),
+                  disabled: !canUpdateIP,
+                },
+                {
+                  key: 'delete',
+                  label: 'Xóa',
+                  icon: <DeleteOutlined />,
+                  onClick: () => {
+                    if (canDeleteIP) {
+                      if (window.confirm('Bạn có chắc chắn muốn xóa IP address này?')) {
+                        handleDelete(ip.id);
+                      }
+                    }
+                  },
+                  disabled: !canDeleteIP,
+                },
+              ];
+
+              return (
+                <Dropdown menu={{ items }} placement="bottomRight" trigger={['click']} getPopupContainer={(_trigger) => document.body}>
+                  <Button icon={<ToolOutlined />} size="small" type="text">
+                    Hành động
                   </Button>
-                </Popconfirm>
-              )}
-            </Space>
+                </Dropdown>
+              );
+            })()}
           </Col>
         </Row>
       </Card>
@@ -435,7 +525,7 @@ const UnitDetailPage = () => {
             {unit && (
               <div style={{ marginTop: 8, color: '#666' }}>
                 {unit.address && <span>Địa chỉ: {unit.address} | </span>}
-                <span>Số IP: <Tag color="blue">{ipAddresses.length}</Tag></span>
+                <span>Số IP: <Tag color="blue">{filteredIPAddresses.length}</Tag></span>
               </div>
             )}
           </Col>
@@ -448,15 +538,48 @@ const UnitDetailPage = () => {
           </Col>
         </Row>
 
+        {/* Search and Filter Bar */}
+        <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
+          <Col xs={24} sm={24} md={12} lg={8}>
+            <AntInput
+              placeholder="Tìm kiếm theo IP, MAC, tên thiết bị, port, mô tả..."
+              prefix={<SearchOutlined />}
+              value={searchKeyword}
+              onChange={(e) => setSearchKeyword(e.target.value)}
+              allowClear
+              style={{ width: '100%' }}
+            />
+          </Col>
+          <Col xs={24} sm={24} md={12} lg={8}>
+            <Select
+              placeholder="Lọc theo loại thiết bị"
+              value={deviceTypeFilter}
+              onChange={(value) => setDeviceTypeFilter(value)}
+              allowClear
+              style={{ width: '100%' }}
+              options={[
+                { value: 'PC', label: 'PC' },
+                { value: 'Printer', label: 'Máy in' },
+                { value: 'Server', label: 'Máy chủ' },
+                { value: 'Router', label: 'Router' },
+                { value: 'Switch', label: 'Switch' },
+                { value: 'Camera', label: 'Camera' },
+                { value: 'IoT', label: 'IoT Device' },
+                { value: 'Other', label: 'Khác' },
+              ]}
+            />
+          </Col>
+        </Row>
+
         {isMobile ? (
           <div style={{ marginTop: 16 }}>
-            {ipAddresses.length === 0 ? (
+            {filteredIPAddresses.length === 0 ? (
               <div style={{ textAlign: 'center', padding: 40, color: '#999' }}>
-                Không có IP address nào
+                {ipAddresses.length === 0 ? 'Không có IP address nào' : 'Không có kết quả phù hợp'}
               </div>
             ) : (
               <>
-                {ipAddresses.map((ipItem) => (
+                {filteredIPAddresses.map((ipItem) => (
                   <IPCard key={ipItem.id} ip={ipItem} />
                 ))}
               </>
@@ -465,7 +588,7 @@ const UnitDetailPage = () => {
         ) : (
           <Table
             columns={columns}
-            dataSource={ipAddresses}
+            dataSource={filteredIPAddresses}
             rowKey="id"
             loading={loading}
             pagination={{ pageSize: 10, showSizeChanger: true }}
@@ -473,7 +596,7 @@ const UnitDetailPage = () => {
             size="small"
             rowClassName={(record) => {
               // Check if this IP address is duplicated within the same unit
-              const duplicateIPs = ipAddresses.filter(
+              const duplicateIPs = filteredIPAddresses.filter(
                 (ip) => ip.ipAddress === record.ipAddress && ip.id !== record.id
               );
               return duplicateIPs.length > 0 ? 'duplicate-ip-row' : '';
@@ -481,16 +604,6 @@ const UnitDetailPage = () => {
           />
         )}
       </Card>
-
-      {id && unitName && (
-        <DrawingManagement
-          unitId={parseInt(id)}
-          unitName={unitName}
-          canCreate={canCreateDrawing && hasUnitAccess}
-          canUpdate={canUpdateDrawing && hasUnitAccess}
-          canDelete={canDeleteDrawing && hasUnitAccess}
-        />
-      )}
 
       <Modal
         title={editingId ? 'Sửa IP Address' : 'Thêm IP Address'}
@@ -553,6 +666,23 @@ const UnitDetailPage = () => {
             label="Port"
           >
             <Input placeholder="e.g., ETH0" />
+          </Form.Item>
+
+          <Form.Item
+            name="networkSystemId"
+            label="Hệ thống mạng"
+          >
+            <Select 
+              placeholder="Chọn hệ thống mạng (tùy chọn)" 
+              allowClear
+              loading={networkSystemsLoading}
+            >
+              {networkSystems.map((ns) => (
+                <Select.Option key={ns.id} value={ns.id}>
+                  {ns.name}
+                </Select.Option>
+              ))}
+            </Select>
           </Form.Item>
 
           <Form.Item

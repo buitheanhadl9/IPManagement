@@ -116,6 +116,7 @@ namespace IPManagement.API.Services
             var totalCount = await query.CountAsync();
             var ipList = await query
                 .Include(ip => ip.Unit)
+                .Include(ip => ip.NetworkSystems).ThenInclude(ns => ns.NetworkSystem)
                 .OrderByDescending(ip => ip.CreatedAt)
                 .Skip((pageNumber - 1) * pageSize)
                 .Take(pageSize)
@@ -137,7 +138,9 @@ namespace IPManagement.API.Services
                 CreatedAt = ip.CreatedAt,
                 UpdatedAt = ip.UpdatedAt,
                 IsOnline = ip.IsOnline,
-                LastPingTime = ip.LastPingTime
+                LastPingTime = ip.LastPingTime,
+                NetworkSystemId = ip.NetworkSystems.FirstOrDefault()?.NetworkSystemId,
+                NetworkSystemName = ip.NetworkSystems.FirstOrDefault()?.NetworkSystem?.Name
             }).ToArray();
 
             return new IPAddressListResponse
@@ -153,6 +156,7 @@ namespace IPManagement.API.Services
         {
             var ip = await _context.IPAddresses
                 .Include(ip => ip.Unit)
+                .Include(ip => ip.NetworkSystems).ThenInclude(ns => ns.NetworkSystem)
                 .FirstOrDefaultAsync(ip => ip.Id == ipId);
 
             if (ip == null)
@@ -177,7 +181,9 @@ namespace IPManagement.API.Services
                 CreatedAt = ip.CreatedAt,
                 UpdatedAt = ip.UpdatedAt,
                 IsOnline = ip.IsOnline,
-                LastPingTime = ip.LastPingTime
+                LastPingTime = ip.LastPingTime,
+                NetworkSystemId = ip.NetworkSystems.FirstOrDefault()?.NetworkSystemId,
+                NetworkSystemName = ip.NetworkSystems.FirstOrDefault()?.NetworkSystem?.Name
             };
         }
 
@@ -266,6 +272,24 @@ namespace IPManagement.API.Services
             _context.IPAddresses.Add(ipRecord);
             await _context.SaveChangesAsync();
 
+            // Assign to NetworkSystem if provided
+            if (request.NetworkSystemId.HasValue)
+            {
+                var networkSystemExists = await _context.NetworkSystems.AnyAsync(ns => ns.Id == request.NetworkSystemId.Value);
+                if (networkSystemExists)
+                {
+                    var networkSystemIpAddress = new NetworkSystemIpAddress
+                    {
+                        NetworkSystemId = request.NetworkSystemId.Value,
+                        IpAddressId = ipRecord.Id,
+                        CreatedBy = userId.ToString(),
+                        CreatedAt = DateTime.UtcNow
+                    };
+                    _context.NetworkSystemIpAddresses.Add(networkSystemIpAddress);
+                    await _context.SaveChangesAsync();
+                }
+            }
+
             return new IPAddressDto
             {
                 Id = ipRecord.Id,
@@ -285,7 +309,9 @@ namespace IPManagement.API.Services
 
         public async Task<IPAddressDto?> UpdateIPAddressAsync(Guid userId, long ipId, IPAddressUpdateRequest request)
         {
-            var ip = await _context.IPAddresses.FindAsync(ipId);
+            var ip = await _context.IPAddresses
+                .Include(ip => ip.NetworkSystems)
+                .FirstOrDefaultAsync(ip => ip.Id == ipId);
             if (ip == null)
                 return null;
 
@@ -302,7 +328,46 @@ namespace IPManagement.API.Services
             ip.UpdatedBy = userId.ToString();
             ip.UpdatedAt = DateTime.UtcNow;
 
+            // Update NetworkSystem assignment
+            if (request.NetworkSystemId.HasValue)
+            {
+                // Remove existing network system assignments
+                var existingAssignments = ip.NetworkSystems.ToList();
+                foreach (var assignment in existingAssignments)
+                {
+                    _context.NetworkSystemIpAddresses.Remove(assignment);
+                }
+
+                // Add new network system assignment if it exists
+                var networkSystemExists = await _context.NetworkSystems.AnyAsync(ns => ns.Id == request.NetworkSystemId.Value);
+                if (networkSystemExists)
+                {
+                    var networkSystemIpAddress = new NetworkSystemIpAddress
+                    {
+                        NetworkSystemId = request.NetworkSystemId.Value,
+                        IpAddressId = ip.Id,
+                        CreatedBy = userId.ToString(),
+                        CreatedAt = DateTime.UtcNow
+                    };
+                    _context.NetworkSystemIpAddresses.Add(networkSystemIpAddress);
+                }
+            }
+            else
+            {
+                // Remove all network system assignments if NetworkSystemId is null
+                var existingAssignments = ip.NetworkSystems.ToList();
+                foreach (var assignment in existingAssignments)
+                {
+                    _context.NetworkSystemIpAddresses.Remove(assignment);
+                }
+            }
+
             await _context.SaveChangesAsync();
+
+            // Reload with network system info
+            ip = await _context.IPAddresses
+                .Include(ip => ip.NetworkSystems).ThenInclude(ns => ns.NetworkSystem)
+                .FirstOrDefaultAsync(ip => ip.Id == ipId);
 
             return new IPAddressDto
             {
@@ -318,7 +383,9 @@ namespace IPManagement.API.Services
                 Status = ip.Status,
                 CreatedAt = ip.CreatedAt,
                 UpdatedAt = ip.UpdatedAt,
-                IsOnline = ip.IsOnline
+                IsOnline = ip.IsOnline,
+                NetworkSystemId = ip.NetworkSystems.FirstOrDefault()?.NetworkSystemId,
+                NetworkSystemName = ip.NetworkSystems.FirstOrDefault()?.NetworkSystem?.Name
             };
         }
 
@@ -330,6 +397,12 @@ namespace IPManagement.API.Services
             var ip = await _context.IPAddresses.FindAsync(ipId);
             if (ip == null)
                 return false;
+
+            // Remove associated NetworkSystemIpAddress records
+            var networkSystemAssignments = await _context.NetworkSystemIpAddresses
+                .Where(ns => ns.IpAddressId == ipId)
+                .ToListAsync();
+            _context.NetworkSystemIpAddresses.RemoveRange(networkSystemAssignments);
 
             _context.IPAddresses.Remove(ip);
             await _context.SaveChangesAsync();

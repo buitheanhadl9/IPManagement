@@ -5,8 +5,10 @@ using IPManagement.API.Services;
 using IPManagement.API.Extensions;
 using IPManagement.API.Authorization;
 using IPManagement.API.Hubs;
+using IPManagement.API.Swagger;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -108,6 +110,9 @@ builder.Services.AddSwaggerGen(c =>
             Array.Empty<string>()
         }
     });
+
+    // Add OperationFilter for IFormFile
+    c.OperationFilter<IFormFileOperationFilter>();
 });
 
 // Register Services
@@ -118,6 +123,7 @@ builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IRoleService, RoleService>();
 builder.Services.AddScoped<IPermissionNotificationService, PermissionNotificationService>();
 builder.Services.AddScoped<IDrawingService, DrawingService>();
+builder.Services.AddScoped<INetworkSystemService, NetworkSystemService>();
 
 // Configure SignalR
 builder.Services.AddSignalR(options =>

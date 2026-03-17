@@ -100,6 +100,10 @@ namespace IPManagement.API.Services
 
             // Get user permissions
             var permissions = await _userManager.GetPermissionsAsync(user, _context);
+            
+            // Debug log
+            Console.WriteLine($"[AuthService] User {user.UserName} roles: {string.Join(", ", roles)}");
+            Console.WriteLine($"[AuthService] User {user.UserName} permissions: {string.Join(", ", permissions)}");
 
             return new LoginResponse
             {
