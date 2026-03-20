@@ -20,15 +20,12 @@ class SignalRService {
    * Khởi tạo SignalR connection
    */
   public async startConnection(): Promise<void> {
-    console.log('[SignalR] startConnection called, connection exists:', !!this.connection);
     if (this.connection) {
-      console.log('[SignalR] Connection already exists, state:', this.connection.state);
       return;
     }
 
     try {
       const token = localStorage.getItem('token');
-      console.log('[SignalR] Token exists:', !!token);
       
       this.connection = new HubConnectionBuilder()
         .withUrl(`${SIGNALR_HUB_URL}/notificationHub`, {
@@ -44,7 +41,6 @@ class SignalRService {
 
       // Start connection
       await this.connection.start();
-      console.log('[SignalR] Connected to NotificationHub');
       this.reconnectAttempts = 0;
 
       // Trigger connected callbacks
@@ -55,7 +51,6 @@ class SignalRService {
       this.reconnectAttempts++;
       
       if (this.reconnectAttempts < this.maxReconnectAttempts) {
-        console.log(`[SignalR] Retrying in ${this.RECONNECT_DELAY}ms...`);
         setTimeout(() => this.startConnection(), this.RECONNECT_DELAY);
       }
     }
@@ -69,25 +64,21 @@ class SignalRService {
 
     // Handle PermissionsUpdated event
     this.connection.on('PermissionsUpdated', (notification: PermissionUpdateNotification) => {
-      console.log('[SignalR] PermissionsUpdated received:', notification);
       this.onPermissionsUpdatedCallbacks.forEach(cb => cb(notification));
     });
 
     // Handle UserNotification event
     this.connection.on('UserNotification', (message: string) => {
-      console.log('[SignalR] UserNotification received:', message);
       this.onUserNotificationCallbacks.forEach(cb => cb(message));
     });
 
     // Handle UnitUpdated event
     this.connection.on('UnitUpdated', (notification: UnitUpdateNotification) => {
-      console.log('[SignalR] UnitUpdated received:', notification);
       this.onUnitUpdatedCallbacks.forEach(cb => cb(notification));
     });
 
     // Handle close event
     this.connection.onclose(() => {
-      console.log('[SignalR] Connection closed');
       this.onDisconnectedCallbacks.forEach(cb => cb());
     });
   }
@@ -97,13 +88,11 @@ class SignalRService {
    */
   public async joinRoleGroup(roleName: string): Promise<void> {
     if (!this.connection || this.connection.state !== HubConnectionState.Connected) {
-      console.log('[SignalR] Cannot join group: not connected');
       return;
     }
 
     try {
       await this.connection.invoke('JoinGroup', `role:${roleName}`);
-      console.log(`[SignalR] Joined group: role:${roleName}`);
     } catch (error) {
       console.error(`[SignalR] Failed to join group role:${roleName}:`, error);
     }
@@ -119,7 +108,6 @@ class SignalRService {
 
     try {
       await this.connection.invoke('LeaveGroup', `role:${roleName}`);
-      console.log(`[SignalR] Left group: role:${roleName}`);
     } catch (error) {
       console.error(`[SignalR] Failed to leave group role:${roleName}:`, error);
     }
@@ -193,7 +181,6 @@ class SignalRService {
         console.error('[SignalR] Error stopping connection:', error);
       }
       this.connection = null;
-      console.log('[SignalR] Connection stopped');
     }
   }
 }

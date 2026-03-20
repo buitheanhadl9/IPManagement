@@ -124,6 +124,7 @@ builder.Services.AddScoped<IRoleService, RoleService>();
 builder.Services.AddScoped<IPermissionNotificationService, PermissionNotificationService>();
 builder.Services.AddScoped<IDrawingService, DrawingService>();
 builder.Services.AddScoped<INetworkSystemService, NetworkSystemService>();
+builder.Services.AddScoped<ITransmissionChannelService, TransmissionChannelService>();
 
 // Configure SignalR
 builder.Services.AddSignalR(options =>

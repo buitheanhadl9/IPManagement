@@ -32,6 +32,8 @@ namespace IPManagement.API.Models
         
         public ICollection<Drawing> Drawings { get; set; } = new List<Drawing>();
         
+        public ICollection<UnitTransmissionChannel> TransmissionChannels { get; set; } = new List<UnitTransmissionChannel>();
+        
         [StringLength(1000)]
         public string? Description { get; set; }
         
@@ -43,5 +45,7 @@ namespace IPManagement.API.Models
         public DateTime? UpdatedAt { get; set; }
         
         public bool IsActive { get; set; } = true;
+        
+        public int DisplayOrder { get; set; } = 0;
     }
 }

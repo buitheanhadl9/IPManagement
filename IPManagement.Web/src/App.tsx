@@ -18,6 +18,7 @@ import SettingsPage from './pages/SettingsPage';
 import RolesPage from './pages/RolesPage';
 import DrawingPage from './pages/DrawingPage';
 import NetworkSystemPage from './pages/NetworkSystemPage';
+import TransmissionChannelPage from './pages/TransmissionChannelPage';
 
 function ActivityTracker() {
   useUserActivity();
@@ -34,14 +35,9 @@ function AuthChecker() {
 
   useEffect(() => {
     const token = localStorage.getItem('token');
-    console.log('[AuthChecker] Token exists:', !!token);
     if (token) {
-      console.log('[AuthChecker] Fetching profile...');
       dispatch(fetchProfile())
         .unwrap()
-        .then((user) => {
-          console.log('[AuthChecker] Profile fetched successfully:', user);
-        })
         .catch((error) => {
           console.error('[AuthChecker] Failed to fetch profile:', error);
           localStorage.removeItem('token');
@@ -75,6 +71,7 @@ function AppContent() {
                     <Route path="settings" element={<SettingsPage />} />
                     <Route path="roles" element={<RolesPage />} />
                     <Route path="network-systems" element={<NetworkSystemPage />} />
+                    <Route path="transmission-channels" element={<TransmissionChannelPage />} />
                   </Routes>
               </MainLayout>
             </PrivateRoute>

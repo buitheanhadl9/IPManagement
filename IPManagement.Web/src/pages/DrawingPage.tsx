@@ -243,9 +243,6 @@ const DrawingPage = () => {
   const handleUpload = async (values: DrawingUploadRequest) => {
     const fileValue = uploadForm.getFieldValue('file');
     
-    console.log('[DrawingPage] Upload values:', values);
-    console.log('[DrawingPage] File value from form:', fileValue);
-    
     // Ant Design Upload có thể trả về object với thuộc tính 'file' hoặc 'fileList'
     let file = fileValue;
     if (fileValue && fileValue.file) {
@@ -254,16 +251,12 @@ const DrawingPage = () => {
       file = fileValue.fileList[0];
     }
     
-    console.log('[DrawingPage] Extracted file:', file);
-    
     if (!file) {
       message.error('Vui lòng chọn file');
       return;
     }
 
     const actualFile = file.originFileObj || file.raw || file;
-    
-    console.log('[DrawingPage] Actual file:', actualFile);
 
     if (!actualFile) {
       message.error('Không thể đọc file. Vui lòng thử lại.');
@@ -274,8 +267,6 @@ const DrawingPage = () => {
     formData.append('file', actualFile);
     if (values.version) formData.append('version', values.version || '');
     if (values.description) formData.append('description', values.description || '');
-
-    console.log('[DrawingPage] Sending upload request with unitId:', id);
 
     try {
       await drawingService.uploadDrawingWithUnitId(parseInt(id!), formData);
@@ -608,8 +599,6 @@ const DrawingPage = () => {
         onOk={() => {
           editForm.validateFields().then(values => {
             handleSubmitEdit(values);
-          }).catch(info => {
-            console.log('Validate Failed:', info);
           });
         }}
         okText="Lưu"

@@ -11,8 +11,10 @@ export interface Unit {
   createdAt: string;
   updatedAt?: string;
   isActive: boolean;
+  displayOrder?: number;
   childUnits?: Unit[];
   ipAddressCount?: number;
+  transmissionChannelIds?: number[];
 }
 
 export interface UnitTree {
@@ -32,6 +34,7 @@ export interface UnitCreateRequest {
   parentUnitId?: number;
   description?: string;
   note?: string;
+  transmissionChannelIds?: number[];
 }
 
 export interface UnitUpdateRequest {
@@ -42,4 +45,18 @@ export interface UnitUpdateRequest {
   description?: string;
   note?: string;
   isActive: boolean;
+  displayOrder?: number;
+  transmissionChannelIds?: number[];
+}
+
+export interface UnitSelectionDto {
+  id: number;
+  name: string;
+  code?: string;
+}
+
+export interface TransmissionChannelSelection {
+  id: number;
+  code: string;
+  provider: string;
 }

@@ -22,6 +22,8 @@ namespace IPManagement.API.DTOs
 
         [StringLength(1000)]
         public string? Note { get; set; }
+
+        public long[]? TransmissionChannelIds { get; set; }
     }
 
     public class UnitUpdateRequest
@@ -43,8 +45,12 @@ namespace IPManagement.API.DTOs
 
         [StringLength(1000)]
         public string? Note { get; set; }
-
+    
         public bool IsActive { get; set; }
+    
+        public int DisplayOrder { get; set; } = 0;
+    
+        public long[]? TransmissionChannelIds { get; set; }
     }
 
     public class UnitDto
@@ -61,8 +67,10 @@ namespace IPManagement.API.DTOs
         public DateTime CreatedAt { get; set; }
         public DateTime? UpdatedAt { get; set; }
         public bool IsActive { get; set; }
+        public int DisplayOrder { get; set; }
         public UnitDto[]? ChildUnits { get; set; }
         public int IPAddressCount { get; set; }
+        public long[]? TransmissionChannelIds { get; set; }
     }
 
     public class UnitTreeDto

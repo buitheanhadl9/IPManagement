@@ -70,21 +70,7 @@ const UnitDetailPage = () => {
     return canReadIP && isAssignedToUnit(user, parseInt(id));
   }, [user, id, canReadIP, isAuthenticated]);
 
-  // Debug log for permissions
-  useEffect(() => {
-    if (user) {
-      console.log('[UnitDetailPage] Debug permissions:', {
-        username: user.username,
-        roles: user.roles,
-        permissions: user.permissions,
-        canCreateDrawing,
-        canUpdateDrawing,
-        canDeleteDrawing,
-        hasUnitAccess,
-        isAdmin: isAdmin(user)
-      });
-    }
-  }, [user, canCreateDrawing, canUpdateDrawing, canDeleteDrawing, hasUnitAccess]);
+
 
   useEffect(() => {
     // Đợi user được load xong trước khi kiểm tra quyền
@@ -108,8 +94,6 @@ const UnitDetailPage = () => {
 
     // Listen for unit update notifications
     const unsubscribeUnit = signalRService.onUnitUpdated((notification: UnitUpdateNotification) => {
-      console.log('[UnitDetailPage] Unit update notification received:', notification);
-      
       // Nếu notification liên quan đến unit hiện tại
       if (id && notification.unitId === parseInt(id)) {
         if (notification.action === 'Deleted') {
@@ -244,16 +228,12 @@ const UnitDetailPage = () => {
       return;
     }
     createValues.unitId = parseInt(id);
-    console.log('Form values before submit:', values);
-    console.log('Form values unitId (ensured):', createValues.unitId);
     try {
       if (editingId) {
         await ipService.updateIPAddress(editingId, values as IPAddressUpdateRequest);
         message.success('IP address updated successfully');
       } else {
-        console.log('Creating IP with values:', createValues);
-        const result = await ipService.createIPAddress(createValues);
-        console.log('Create result:', result);
+        await ipService.createIPAddress(createValues);
         message.success('IP address created successfully');
       }
       setModalVisible(false);

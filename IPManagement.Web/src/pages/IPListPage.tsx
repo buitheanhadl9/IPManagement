@@ -16,19 +16,6 @@ const IPListPage = () => {
   const user = useAppSelector((state) => state.auth.user);
   const isLoading = useAppSelector((state) => state.auth.isLoading);
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
-  
-  // Debug: Log user info
-  useEffect(() => {
-    console.log('=== IPListPage User Info ===');
-    console.log('User:', user);
-    console.log('User roles:', user?.roles);
-    console.log('Initial isMobile:', window.innerWidth < 768, 'Window width:', window.innerWidth);
-  }, [user]);
-  
-  // Debug log for isMobile
-  useEffect(() => {
-    console.log('isMobile changed to:', isMobile, 'Window width:', window.innerWidth);
-  }, [isMobile]);
   const [ipAddresses, setIPAddresses] = useState<IPAddress[]>([]);
   const [units, setUnits] = useState<Unit[]>([]);
   const [loading, setLoading] = useState(false);
@@ -56,16 +43,9 @@ const IPListPage = () => {
 
   // Không fetch dữ liệu nếu không có quyền IP_READ
   useEffect(() => {
-    console.log('=== IPListPage useEffect ===');
-    console.log('user:', user);
-    console.log('canReadIP:', canReadIP);
-    console.log('selectedUnitId:', selectedUnitId);
-    
     if (!user || !canReadIP) {
-      console.log('Skipping fetch - no user or no permission');
       return;
     }
-    console.log('Fetching IP addresses...');
     fetchIPAddresses();
     fetchUnits();
 
@@ -90,14 +70,10 @@ const IPListPage = () => {
   };
 
   const fetchIPAddresses = async () => {
-    console.log('=== fetchIPAddresses ===');
     setLoading(true);
     try {
-      console.log('Calling API with selectedUnitId:', selectedUnitId);
       const response = await ipService.getIPAddresses(1, 100, undefined, selectedUnitId || undefined);
-      console.log('API response:', response);
       setIPAddresses(response.items);
-      console.log('Set IP addresses, count:', response.items?.length);
     } catch (error) {
       console.error('Failed to fetch IP addresses:', error);
       message.error('Failed to fetch IP addresses');
@@ -212,10 +188,7 @@ const IPListPage = () => {
       title: 'Unit',
       dataIndex: 'unitName',
       key: 'unitName',
-      render: (unitName: string | undefined, record: IPAddress) => {
-        console.log('=== Unit Column Debug ===');
-        console.log('unitName:', unitName);
-        console.log('record:', record);
+      render: (unitName: string | undefined) => {
         return unitName || '-';
       },
     },

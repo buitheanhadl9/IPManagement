@@ -27,6 +27,11 @@ namespace IPManagement.API.Controllers
         {
             var userId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value!);
             var result = await _unitService.GetAllUnitsAsync(userId);
+            Console.WriteLine($"[UnitsController] GetAllUnits - Result count: {result.Length}");
+            foreach (var unit in result)
+            {
+                Console.WriteLine($"[UnitsController] Unit '{unit.Name}' - TransmissionChannelIds: {unit.TransmissionChannelIds?.Length ?? 0} items");
+            }
             return Ok(result);
         }
 
@@ -80,6 +85,8 @@ namespace IPManagement.API.Controllers
         public async Task<ActionResult<UnitDto>> CreateUnit([FromBody] UnitCreateRequest request)
         {
             var userId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value!);
+            Console.WriteLine($"[UnitsController] CreateUnit - Request: {System.Text.Json.JsonSerializer.Serialize(request)}");
+            Console.WriteLine($"[UnitsController] CreateUnit - TransmissionChannelIds: {request.TransmissionChannelIds?.Length ?? 0} items");
             try
             {
                 var result = await _unitService.CreateUnitAsync(userId, request);
@@ -100,6 +107,8 @@ namespace IPManagement.API.Controllers
         public async Task<ActionResult<UnitDto>> UpdateUnit(long unitId, [FromBody] UnitUpdateRequest request)
         {
             var userId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value!);
+            Console.WriteLine($"[UnitsController] UpdateUnit - Request: {System.Text.Json.JsonSerializer.Serialize(request)}");
+            Console.WriteLine($"[UnitsController] UpdateUnit - TransmissionChannelIds: {request.TransmissionChannelIds?.Length ?? 0} items");
             try
             {
                 var result = await _unitService.UpdateUnitAsync(userId, unitId, request);
@@ -142,6 +151,26 @@ namespace IPManagement.API.Controllers
             catch (Exception ex)
             {
                 return BadRequest(new { message = $"Failed to delete unit: {ex.Message}" });
+            }
+        }
+        
+        [HttpPost("update-display-order")]
+        [RequirePermission(FunctionCode.UNIT, CommandCode.UPDATE)]
+        public async Task<ActionResult> UpdateDisplayOrder([FromBody] Dictionary<long, int> unitOrderMap)
+        {
+            var userId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value!);
+            try
+            {
+                await _unitService.UpdateUnitDisplayOrderAsync(userId, unitOrderMap);
+                return Ok(new { message = "Display order updated successfully" });
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return Unauthorized(new { message = "You do not have permission to update unit display order" });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = $"Failed to update display order: {ex.Message}" });
             }
         }
     }

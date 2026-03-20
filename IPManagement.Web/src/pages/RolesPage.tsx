@@ -71,6 +71,15 @@ const PERMISSION_CATEGORIES = {
       { key: Permissions.NETWORK_SYSTEM_DELETE, label: 'Delete' },
     ]
   },
+  TRANSMISSION_CHANNEL: {
+    label: 'Transmission Channel',
+    permissions: [
+      { key: Permissions.TRANSMISSION_CHANNEL_CREATE, label: 'Create' },
+      { key: Permissions.TRANSMISSION_CHANNEL_READ, label: 'Read' },
+      { key: Permissions.TRANSMISSION_CHANNEL_UPDATE, label: 'Update' },
+      { key: Permissions.TRANSMISSION_CHANNEL_DELETE, label: 'Delete' },
+    ]
+  },
 };
 
 const RolesPage = () => {
@@ -262,8 +271,6 @@ const RolesPage = () => {
     const selectedPermissions = Object.entries(formValues)
       .filter(([_, checked]) => checked === true)
       .map(([permission]) => permission);
-
-    console.log('Selected permissions:', selectedPermissions);
 
     try {
       await permissionService.updateRolePermissions(editingRole.id, selectedPermissions);

@@ -1,7 +1,7 @@
-import { useState, useEffect, useMemo } from 'react';
-import { Table, Button, Modal, Form, Input, Select, message, Space, Popconfirm, Tag, Card, Row, Col, Typography, Dropdown } from 'antd';
-import { PlusOutlined, EditOutlined, DeleteOutlined, SearchOutlined, EnvironmentOutlined, WifiOutlined, FolderOpenOutlined, ToolOutlined } from '@ant-design/icons';
-import type { Unit, UnitCreateRequest, UnitUpdateRequest } from '../types/unit';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { Table, Button, Modal, Form, Input, Select, message, Space, Tag, Card, Row, Col, Typography, Dropdown } from 'antd';
+import { PlusOutlined, EditOutlined, DeleteOutlined, SearchOutlined, EnvironmentOutlined, WifiOutlined, FolderOpenOutlined, ToolOutlined, DownOutlined, UpOutlined } from '@ant-design/icons';
+import type { Unit, UnitCreateRequest, UnitUpdateRequest, TransmissionChannelSelection } from '../types/unit';
 import { unitService } from '../services/unit.service';
 import { useNavigate } from 'react-router-dom';
 import { useAppSelector } from '../hooks/useAppSelector';
@@ -18,12 +18,16 @@ const UnitsPage = () => {
   const [units, setUnits] = useState<Unit[]>([]);
   const [filteredUnits, setFilteredUnits] = useState<Unit[]>([]);
   const [loading, setLoading] = useState(false);
+  const [sortInfo, setSortInfo] = useState<{ field: string; order: 'ascend' | 'descend' | null }>({ field: '', order: null });
   const [modalVisible, setModalVisible] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [form] = Form.useForm();
   const [searchTerm, setSearchTerm] = useState('');
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const [transmissionChannels, setTransmissionChannels] = useState<TransmissionChannelSelection[]>([]);
+  const [channelsLoading, setChannelsLoading] = useState(false);
   const navigate = useNavigate();
+  const [editingPositionId, setEditingPositionId] = useState<number | null>(null);
 
   // Check permissions based on user permissions - use useMemo to re-calculate when user changes
   // Chỉ check permission khi đã load xong user
@@ -42,11 +46,10 @@ const UnitsPage = () => {
 
   useEffect(() => {
     fetchUnits();
+    fetchTransmissionChannels();
 
     // Listen for unit update notifications
     const unsubscribeUnit = signalRService.onUnitUpdated((notification: UnitUpdateNotification) => {
-      console.log('[UnitsPage] Unit update notification received:', notification);
-      
       // Refresh units list when any unit changes
       if (notification.action === 'Deleted') {
         message.success(`Đơn vị "${notification.unitName}" đã được xóa.`);
@@ -71,47 +74,162 @@ const UnitsPage = () => {
     };
   }, []);
 
+  // Helper function to find all child unit IDs recursively
+  const getAllChildUnitIds = (parentId: number, allUnits: Unit[]): number[] => {
+    const children = allUnits.filter((u) => u.parentUnitId === parentId);
+    let childIds: number[] = children.map((c) => c.id);
+    
+    for (const child of children) {
+      childIds = [...childIds, ...getAllChildUnitIds(child.id, allUnits)];
+    }
+    
+    return childIds;
+  };
+
   useEffect(() => {
+    let result = [...units];
+    
+    // Filter by search term
     if (searchTerm.trim()) {
       const lowerTerm = searchTerm.toLowerCase();
-      const filtered = units.filter((u) =>
+      const matchedUnits = units.filter((u) =>
         u.name.toLowerCase().includes(lowerTerm) ||
         u.code?.toLowerCase().includes(lowerTerm)
       );
-      setFilteredUnits(filtered);
-    } else {
-      setFilteredUnits(units);
+      
+      // Include matched units and all their child units
+      const matchedIds = new Set<number>();
+      for (const unit of matchedUnits) {
+        matchedIds.add(unit.id);
+        const childIds = getAllChildUnitIds(unit.id, units);
+        childIds.forEach((id) => matchedIds.add(id));
+      }
+      
+      result = units.filter((u) => matchedIds.has(u.id));
     }
-  }, [searchTerm, units]);
+    
+    // Sort if sortInfo is set
+    if (sortInfo.field && sortInfo.order) {
+      result.sort((a, b) => {
+        let aValue: string | number = '';
+        let bValue: string | number = '';
+        
+        switch (sortInfo.field) {
+          case 'index':
+            // Sort by displayOrder when sorting by index
+            aValue = a.displayOrder ?? 999999;
+            bValue = b.displayOrder ?? 999999;
+            break;
+          case 'name':
+            aValue = a.name.toLowerCase();
+            bValue = b.name.toLowerCase();
+            break;
+          case 'code':
+            aValue = a.code?.toLowerCase() || '';
+            bValue = b.code?.toLowerCase() || '';
+            break;
+          case 'ipAddressCount':
+            aValue = a.ipAddressCount || 0;
+            bValue = b.ipAddressCount || 0;
+            break;
+          case 'isActive':
+            aValue = a.isActive ? 1 : 0;
+            bValue = b.isActive ? 1 : 0;
+            break;
+          default:
+            aValue = a.name.toLowerCase();
+            bValue = b.name.toLowerCase();
+        }
+        
+        let comparison = 0;
+        if (aValue < bValue) comparison = -1;
+        if (aValue > bValue) comparison = 1;
+        
+        return sortInfo.order === 'ascend' ? comparison : -comparison;
+      });
+    }
+    
+    setFilteredUnits(result);
+  }, [searchTerm, units, sortInfo]);
 
   const fetchUnits = async () => {
     setLoading(true);
     try {
       const data = await unitService.getAllUnits();
-      setUnits(data);
+      // Sort units by displayOrder
+      const sortedData = [...data].sort((a, b) => {
+        const aOrder = a.displayOrder ?? 999999;
+        const bOrder = b.displayOrder ?? 999999;
+        return aOrder - bOrder;
+      });
+      setUnits(sortedData);
     } catch {
       message.error('Failed to fetch units');
     } finally {
       setLoading(false);
     }
   };
+  
+  const handlePositionChange = useCallback(async (unitId: number, newPosition: number) => {
+    const currentIndex = units.findIndex((u) => u.id === unitId);
+    if (currentIndex === -1) return;
+    
+    // Create new order array
+    const newUnits = [...units];
+    const unitToRemove = newUnits.splice(currentIndex, 1)[0];
+    newUnits.splice(newPosition, 0, unitToRemove);
+    
+    // Calculate new display orders
+    const unitOrderMap: Record<number, number> = {};
+    newUnits.forEach((u: Unit, index: number) => {
+      unitOrderMap[u.id] = index;
+    });
+    
+    // Save to backend first
+    try {
+      await unitService.updateUnitDisplayOrder(unitOrderMap);
+      message.success('Đã cập nhật thứ tự đơn vị');
+      
+      // Fetch units again to get the latest data from API
+      await fetchUnits();
+    } catch (error) {
+      console.error('Failed to update display order:', error);
+      message.error('Không thể cập nhật thứ tự đơn vị');
+    }
+    
+    setEditingPositionId(null);
+  }, [units]);
 
-  const handleAdd = () => {
+  const fetchTransmissionChannels = async () => {
+    setChannelsLoading(true);
+    try {
+      const data = await unitService.getAllTransmissionChannels();
+      setTransmissionChannels(data);
+    } catch {
+      message.error('Failed to fetch transmission channels');
+    } finally {
+      setChannelsLoading(false);
+    }
+  };
+
+  const handleAdd = async () => {
     if (!canCreateUnit) {
       message.error('Bạn không có quyền thêm đơn vị.');
       return;
     }
     setEditingId(null);
     form.resetFields();
+    await fetchTransmissionChannels();
     setModalVisible(true);
   };
 
-  const handleEdit = (record: Unit) => {
+  const handleEdit = async (record: Unit) => {
     if (!canUpdateUnit) {
       message.error('Bạn không có quyền chỉnh sửa đơn vị.');
       return;
     }
     setEditingId(record.id);
+    await fetchTransmissionChannels();
     form.setFieldsValue({
       name: record.name,
       code: record.code,
@@ -120,6 +238,7 @@ const UnitsPage = () => {
       description: record.description,
       note: record.note,
       isActive: record.isActive,
+      transmissionChannelIds: record.transmissionChannelIds || [],
     });
     setModalVisible(true);
   };
@@ -148,17 +267,31 @@ const UnitsPage = () => {
       message.error('Bạn không có quyền thêm đơn vị.');
       return;
     }
+    
+    // Ensure transmissionChannelIds is always an array of numbers (even if empty)
+    // Ant Design Select with mode="multiple" may return values as strings or numbers
+    let channelIds: number[] = [];
+    if (values.transmissionChannelIds && Array.isArray(values.transmissionChannelIds)) {
+      channelIds = values.transmissionChannelIds.map(id => Number(id)).filter(id => !isNaN(id));
+    }
+    
+    const submitValues = {
+      ...values,
+      transmissionChannelIds: channelIds
+    };
+    
     try {
       if (editingId) {
-        await unitService.updateUnit(editingId, values as UnitUpdateRequest);
+        await unitService.updateUnit(editingId, submitValues as UnitUpdateRequest);
         message.success('Unit updated successfully');
       } else {
-        await unitService.createUnit(values as UnitCreateRequest);
+        await unitService.createUnit(submitValues as UnitCreateRequest);
         message.success('Unit created successfully');
       }
       setModalVisible(false);
       fetchUnits();
-    } catch {
+    } catch (error) {
+      console.error('[UnitsPage] Failed to save unit:', error);
       message.error('Failed to save unit');
     }
   };
@@ -171,58 +304,204 @@ const UnitsPage = () => {
     navigate(`/units/${unitId}/drawings?name=${encodeURIComponent(unitName)}`);
   };
 
+  const getTransmissionChannelNames = (channelIds: number[] | undefined) => {
+    if (!channelIds || channelIds.length === 0) return '-';
+    const channels = transmissionChannels.filter(c => channelIds.includes(c.id));
+    if (channels.length === 0) return '-';
+    return channels.map(c => `${c.code} (${c.provider})`).join(', ');
+  };
+
+  // Regular Row Component
+  const TableRow: React.FC<any> = (props) => {
+    const { children, 'data-row-key': rowKey, ...restProps } = props;
+    return <tr {...restProps}>{children}</tr>;
+  };
+
+  // State for showing full address/description in table view
+  const [expandedAddressId, setExpandedAddressId] = useState<number | null>(null);
+  const [expandedDescriptionId, setExpandedDescriptionId] = useState<number | null>(null);
+
   const columns = [
+    {
+      title: 'STT',
+      key: 'index',
+      width: 80,
+      align: 'center' as const,
+      render: (_: unknown, record: Unit, index: number) => {
+        const isEditing = editingPositionId === record.id;
+        
+        if (isEditing) {
+          return (
+            <Select
+              size="small"
+              value={index + 1}
+              onChange={(value) => handlePositionChange(record.id, value - 1)}
+              onBlur={() => setEditingPositionId(null)}
+              style={{ width: 100 }}
+              autoFocus
+            >
+              {filteredUnits.map((u, i) => (
+                <Select.Option key={u.id} value={i + 1}>
+                  {i + 1}
+                </Select.Option>
+              ))}
+            </Select>
+          );
+        }
+        
+        return (
+          <a 
+            onClick={() => setEditingPositionId(record.id)}
+            style={{ fontWeight: 500, color: '#1890ff' }}
+          >
+            {index + 1}
+          </a>
+        );
+      },
+      sorter: true,
+      sortOrder: sortInfo.field === 'index' ? sortInfo.order : null,
+    },
     {
       title: 'Tên đơn vị',
       dataIndex: 'name',
       key: 'name',
+      sorter: true,
+      sortOrder: sortInfo.field === 'name' ? sortInfo.order : null,
       render: (name: string, record: Unit) => (
         <a onClick={() => handleViewIPs(record.id, name)} style={{ fontWeight: 500 }}>
           {name}
+          {record.parentUnitName && (
+            <>
+              , <span style={{ color: '#999', fontWeight: 400 }}>{record.parentUnitName}</span>
+            </>
+          )}
         </a>
       ),
-    },
-    {
-      title: 'Mã',
-      dataIndex: 'code',
-      key: 'code',
-      render: (code: string | undefined) => code || '-',
     },
     {
       title: 'Địa chỉ',
       dataIndex: 'address',
       key: 'address',
-      render: (address: string | undefined) => address || '-',
+      render: (_address: string | undefined, record: Unit) => {
+        if (!_address) return '-';
+        const isExpanded = expandedAddressId === record.id;
+        return (
+          <Space>
+            {isExpanded ? (
+              <>
+                <span>{_address}</span>
+                <Button
+                  size="small"
+                  onClick={() => setExpandedAddressId(null)}
+                  icon={<UpOutlined />}
+                  iconPosition="end"
+                  style={{
+                    border: '1px solid #d9d9d9',
+                    borderRadius: '4px',
+                    padding: '2px 8px'
+                  }}
+                >
+                  Thu gọn
+                </Button>
+              </>
+            ) : (
+              <>
+                {_address.length > 30 ? (
+                  <Button
+                    size="small"
+                    onClick={() => setExpandedAddressId(record.id)}
+                    icon={<DownOutlined />}
+                    iconPosition="end"
+                    style={{
+                      border: '1px solid #d9d9d9',
+                      borderRadius: '4px',
+                      padding: '2px 8px',
+                      color: '#1890ff'
+                    }}
+                  >
+                    Xem thêm
+                  </Button>
+                ) : (
+                  <span>{_address}</span>
+                )}
+              </>
+            )}
+          </Space>
+        );
+      },
+    },
+    {
+      title: 'Kênh truyền',
+      key: 'transmissionChannels',
+      render: (_: unknown, record: Unit) => (
+        <span style={{ fontSize: 12 }}>{getTransmissionChannelNames(record.transmissionChannelIds)}</span>
+      ),
     },
     {
       title: 'Mô tả',
       dataIndex: 'description',
       key: 'description',
-      width: 300,
-      render: (description: string | undefined) => <TruncatedDescription description={description} />,
+      render: (description: string | undefined, record: Unit) => {
+        if (!description) return '-';
+        const isExpanded = expandedDescriptionId === record.id;
+        return (
+          <Space>
+            {isExpanded ? (
+              <>
+                <span style={{ color: '#666' }}>{description}</span>
+                <Button
+                  size="small"
+                  onClick={() => setExpandedDescriptionId(null)}
+                  icon={<UpOutlined />}
+                  iconPosition="end"
+                  style={{
+                    border: '1px solid #d9d9d9',
+                    borderRadius: '4px',
+                    padding: '2px 8px'
+                  }}
+                >
+                  Thu gọn
+                </Button>
+              </>
+            ) : (
+              <>
+                {description.length > 30 ? (
+                  <Button
+                    size="small"
+                    onClick={() => setExpandedDescriptionId(record.id)}
+                    icon={<DownOutlined />}
+                    iconPosition="end"
+                    style={{
+                      border: '1px solid #d9d9d9',
+                      borderRadius: '4px',
+                      padding: '2px 8px',
+                      color: '#1890ff'
+                    }}
+                  >
+                    Xem thêm
+                  </Button>
+                ) : (
+                  <span style={{ color: '#666' }}>{description}</span>
+                )}
+              </>
+            )}
+          </Space>
+        );
+      },
     },
     {
       title: 'Số IP',
       dataIndex: 'ipAddressCount',
       key: 'ipAddressCount',
       align: 'center' as const,
+      sorter: true,
+      sortOrder: sortInfo.field === 'ipAddressCount' ? sortInfo.order : null,
       render: (count: number) => <Tag color="blue">{count || 0}</Tag>,
-    },
-    {
-      title: 'Trạng thái',
-      dataIndex: 'isActive',
-      key: 'isActive',
-      align: 'center' as const,
-      width: 100,
-      render: (isActive: boolean) => (
-        <Tag color={isActive ? 'green' : 'default'}>{isActive ? 'Hoạt động' : 'Không hoạt động'}</Tag>
-      ),
     },
     {
       title: 'Quản lý bản vẽ',
       key: 'drawings',
       align: 'center' as const,
-      width: 120,
       render: (_: unknown, record: Unit) => (
         <Button
           icon={<FolderOpenOutlined />}
@@ -238,7 +517,6 @@ const UnitsPage = () => {
       title: 'Hành động',
       key: 'actions',
       align: 'center' as const,
-      width: 100,
       render: (_: unknown, record: Unit) => {
         const items = [
           {
@@ -274,6 +552,9 @@ const UnitsPage = () => {
 
   // UnitCard Component for Mobile View
   const UnitCard = ({ unit }: { unit: Unit }) => {
+    const [showAddress, setShowAddress] = useState(false);
+    const [showDescription, setShowDescription] = useState(false);
+
     return (
       <Card size="small" style={{ marginBottom: 12 }} className="unit-mobile-card">
         <Row gutter={[16, 8]}>
@@ -295,19 +576,106 @@ const UnitsPage = () => {
               <Space>
                 <strong>Đơn vị cấp trên:</strong> <span>{unit.parentUnitName || 'Root'}</span>
               </Space>
-              {unit.address && (
-                <Space>
-                  <strong>Địa chỉ:</strong> <span>{unit.address}</span>
-                </Space>
-              )}
+              <Space>
+                <strong>Địa chỉ:</strong>
+                {unit.address ? (
+                  <>
+                    {showAddress ? (
+                      <>
+                        <span>{unit.address}</span>
+                        <Button
+                          size="small"
+                          onClick={() => setShowAddress(false)}
+                          icon={<UpOutlined />}
+                          iconPosition="end"
+                          style={{
+                            border: '1px solid #d9d9d9',
+                            borderRadius: '4px',
+                            padding: '2px 8px'
+                          }}
+                        >
+                          Thu gọn
+                        </Button>
+                      </>
+                    ) : (
+                      <>
+                        {unit.address.length > 30 ? (
+                          <Button
+                            size="small"
+                            onClick={() => setShowAddress(true)}
+                            icon={<DownOutlined />}
+                            iconPosition="end"
+                            style={{
+                              border: '1px solid #d9d9d9',
+                              borderRadius: '4px',
+                              padding: '2px 8px'
+                            }}
+                          >
+                            Xem thêm
+                          </Button>
+                        ) : (
+                          <span>{unit.address}</span>
+                        )}
+                      </>
+                    )}
+                  </>
+                ) : (
+                  <span>-</span>
+                )}
+              </Space>
+              <Space>
+                <strong>Kênh truyền:</strong> <span style={{ fontSize: 12 }}>{getTransmissionChannelNames(unit.transmissionChannelIds)}</span>
+              </Space>
               <Space>
                 <strong>Số IP:</strong> <Tag color="blue">{unit.ipAddressCount || 0}</Tag>
               </Space>
-              {unit.description && (
-                <Space>
-                  <strong>Mô tả:</strong> <span style={{ color: '#666' }}>{unit.description}</span>
-                </Space>
-              )}
+              <Space>
+                <strong>Mô tả:</strong>
+                {unit.description ? (
+                  <>
+                    {showDescription ? (
+                      <>
+                        <span style={{ color: '#666' }}>{unit.description}</span>
+                        <Button
+                          size="small"
+                          onClick={() => setShowDescription(false)}
+                          icon={<UpOutlined />}
+                          iconPosition="end"
+                          style={{
+                            border: '1px solid #d9d9d9',
+                            borderRadius: '4px',
+                            padding: '2px 8px'
+                          }}
+                        >
+                          Thu gọn
+                        </Button>
+                      </>
+                    ) : (
+                      <>
+                        {unit.description.length > 30 ? (
+                          <Button
+                            size="small"
+                            onClick={() => setShowDescription(true)}
+                            icon={<DownOutlined />}
+                            iconPosition="end"
+                            style={{
+                              border: '1px solid #d9d9d9',
+                              borderRadius: '4px',
+                              padding: '2px 8px'
+                            }}
+                          >
+                            Xem thêm
+                          </Button>
+                        ) : (
+                          <span style={{ color: '#666' }}>{unit.description}</span>
+                        )}
+                      </>
+                    )}
+                  </>
+                ) : (
+                  <span>-</span>
+                )}
+              </Space>
             </Space>
           </Col>
 
@@ -368,10 +736,9 @@ const UnitsPage = () => {
           <Col xs={24} sm={24} md={12} lg={14}>
             <Space direction="horizontal" wrap style={{ width: '100%', justifyContent: 'flex-end' }}>
               <Search
-                placeholder="Tìm kiếm theo tên hoặc mã..."
+                placeholder="Nhấn Enter hoặc nhấn biểu tượng để tìm kiếm"
                 allowClear
                 onSearch={setSearchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
                 style={{ width: '100%', maxWidth: 300 }}
                 prefix={<SearchOutlined />}
               />
@@ -405,8 +772,24 @@ const UnitsPage = () => {
             rowKey="id"
             loading={loading}
             pagination={{ pageSize: 50, showSizeChanger: true, showQuickJumper: true }}
-            scroll={{ x: 900 }}
+            scroll={{ x: 1000 }}
             size="small"
+            components={{
+              body: {
+                row: TableRow,
+              },
+            }}
+            onChange={(_pagination, _filters, sorter) => {
+              const sorterObj = sorter as any;
+              const columnKey = sorterObj.columnKey || sorterObj.field;
+              const order = sorterObj.order;
+              
+              if (columnKey && order) {
+                setSortInfo({ field: columnKey, order: order });
+              } else {
+                setSortInfo({ field: '', order: null });
+              }
+            }}
           />
         )}
       </Card>
@@ -451,6 +834,25 @@ const UnitsPage = () => {
               {units.filter((u) => u.id !== editingId).map((unit) => (
                 <Select.Option key={unit.id} value={unit.id}>
                   {unit.name}
+                </Select.Option>
+              ))}
+            </Select>
+          </Form.Item>
+
+          <Form.Item
+            name="transmissionChannelIds"
+            label="Kênh truyền"
+          >
+            <Select
+              mode="multiple"
+              placeholder="Chọn kênh truyền (tùy chọn)"
+              allowClear
+              loading={channelsLoading}
+              style={{ width: '100%' }}
+            >
+              {transmissionChannels.map((channel) => (
+                <Select.Option key={channel.id} value={channel.id}>
+                  {channel.code} - {channel.provider}
                 </Select.Option>
               ))}
             </Select>

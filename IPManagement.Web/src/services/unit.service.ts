@@ -1,5 +1,5 @@
 import api from './api';
-import type { Unit, UnitTree, UnitCreateRequest, UnitUpdateRequest } from '../types/unit';
+import type { Unit, UnitTree, UnitCreateRequest, UnitUpdateRequest, TransmissionChannelSelection } from '../types/unit';
 
 export interface UnitSelection {
   id: number;
@@ -45,5 +45,14 @@ export const unitService = {
 
   deleteUnit: async (id: number): Promise<void> => {
     await api.delete(`/units/${id}`);
+  },
+
+  updateUnitDisplayOrder: async (unitOrderMap: Record<number, number>): Promise<void> => {
+    await api.post('/units/update-display-order', unitOrderMap);
+  },
+
+  getAllTransmissionChannels: async (): Promise<TransmissionChannelSelection[]> => {
+    const response = await api.get<TransmissionChannelSelection[]>('/TransmissionChannels');
+    return response.data;
   },
 };

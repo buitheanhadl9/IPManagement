@@ -61,7 +61,12 @@ public static class SeedDataExtensions
             PermissionHelper.GetPermission(FunctionCode.NETWORK_SYSTEM, CommandCode.VIEW),
             PermissionHelper.GetPermission(FunctionCode.NETWORK_SYSTEM, CommandCode.CREATE),
             PermissionHelper.GetPermission(FunctionCode.NETWORK_SYSTEM, CommandCode.UPDATE),
-            PermissionHelper.GetPermission(FunctionCode.NETWORK_SYSTEM, CommandCode.DELETE)
+            PermissionHelper.GetPermission(FunctionCode.NETWORK_SYSTEM, CommandCode.DELETE),
+            // Transmission Channel - full access
+            PermissionHelper.GetPermission(FunctionCode.TRANSMISSION_CHANNEL, CommandCode.VIEW),
+            PermissionHelper.GetPermission(FunctionCode.TRANSMISSION_CHANNEL, CommandCode.CREATE),
+            PermissionHelper.GetPermission(FunctionCode.TRANSMISSION_CHANNEL, CommandCode.UPDATE),
+            PermissionHelper.GetPermission(FunctionCode.TRANSMISSION_CHANNEL, CommandCode.DELETE)
         };
 
         foreach (var permission in managerPermissions)
@@ -95,7 +100,12 @@ public static class SeedDataExtensions
             PermissionHelper.GetPermission(FunctionCode.NETWORK_SYSTEM, CommandCode.VIEW),
             PermissionHelper.GetPermission(FunctionCode.NETWORK_SYSTEM, CommandCode.CREATE),
             PermissionHelper.GetPermission(FunctionCode.NETWORK_SYSTEM, CommandCode.UPDATE),
-            PermissionHelper.GetPermission(FunctionCode.NETWORK_SYSTEM, CommandCode.DELETE)
+            PermissionHelper.GetPermission(FunctionCode.NETWORK_SYSTEM, CommandCode.DELETE),
+            // Transmission Channel - full access
+            PermissionHelper.GetPermission(FunctionCode.TRANSMISSION_CHANNEL, CommandCode.VIEW),
+            PermissionHelper.GetPermission(FunctionCode.TRANSMISSION_CHANNEL, CommandCode.CREATE),
+            PermissionHelper.GetPermission(FunctionCode.TRANSMISSION_CHANNEL, CommandCode.UPDATE),
+            PermissionHelper.GetPermission(FunctionCode.TRANSMISSION_CHANNEL, CommandCode.DELETE)
         };
 
         foreach (var permission in userPermissions)

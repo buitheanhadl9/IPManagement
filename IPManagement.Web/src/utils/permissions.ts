@@ -40,6 +40,12 @@ export const Permissions = {
   NETWORK_SYSTEM_READ: 'network_system:view',
   NETWORK_SYSTEM_UPDATE: 'network_system:update',
   NETWORK_SYSTEM_DELETE: 'network_system:delete',
+  
+  // Transmission Channel permissions
+  TRANSMISSION_CHANNEL_CREATE: 'transmission_channel:create',
+  TRANSMISSION_CHANNEL_READ: 'transmission_channel:view',
+  TRANSMISSION_CHANNEL_UPDATE: 'transmission_channel:update',
+  TRANSMISSION_CHANNEL_DELETE: 'transmission_channel:delete',
 };
 
 // Role constants

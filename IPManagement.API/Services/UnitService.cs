@@ -23,6 +23,7 @@ namespace IPManagement.API.Services
         Task<UnitDto> GetMyUnitAsync(Guid userId);
         Task<UnitSelectionDto[]> GetAllUnitsForSelectionAsync();
         Task NotifyUnitChangeAsync(long unitId, string action, string? updatedBy);
+        Task UpdateUnitDisplayOrderAsync(Guid userId, Dictionary<long, int> unitOrderMap);
     }
 
     public class UnitService : IUnitService
@@ -64,26 +65,29 @@ namespace IPManagement.API.Services
             {
                 var allUnitsQuery = _context.Units
                     .Include(u => u.ParentUnit)
+                    .Include(u => u.TransmissionChannels)
                     .AsQueryable();
 
                 var allUnits = await allUnitsQuery.OrderBy(u => u.Name).ToListAsync();
                 
-                return allUnits.Select(u => new UnitDto
-                {
-                    Id = u.Id,
-                    ExternalId = u.ExternalId,
-                    Name = u.Name,
-                    Code = u.Code,
-                    Address = u.Address,
-                    ParentUnitId = u.ParentUnitId,
-                    ParentUnitName = u.ParentUnit == null ? null : u.ParentUnit.Name,
-                    Description = u.Description,
-                    Note = u.Note,
-                    CreatedAt = u.CreatedAt,
-                    UpdatedAt = u.UpdatedAt,
-                    IsActive = u.IsActive,
-                    IPAddressCount = CountIPsForUnit(u.Id)
-                }).ToArray();
+            return allUnits.Select(u => new UnitDto
+            {
+                Id = u.Id,
+                ExternalId = u.ExternalId,
+                Name = u.Name,
+                Code = u.Code,
+                Address = u.Address,
+                ParentUnitId = u.ParentUnitId,
+                ParentUnitName = u.ParentUnit == null ? null : u.ParentUnit.Name,
+                Description = u.Description,
+                Note = u.Note,
+                CreatedAt = u.CreatedAt,
+                UpdatedAt = u.UpdatedAt,
+                IsActive = u.IsActive,
+                DisplayOrder = u.DisplayOrder,
+                IPAddressCount = CountIPsForUnit(u.Id),
+                TransmissionChannelIds = u.TransmissionChannels?.Select(tc => tc.ChannelId).ToArray() ?? Array.Empty<long>()
+            }).ToArray();
             }
 
             // Get assigned unit IDs for the user
@@ -101,6 +105,7 @@ namespace IPManagement.API.Services
             // Return only assigned units and their children
             var filteredUnitsQuery = _context.Units
                 .Include(u => u.ParentUnit)
+                .Include(u => u.TransmissionChannels)
                 .Where(u => unitIdsWithChildren.Contains(u.Id))
                 .AsQueryable();
 
@@ -120,7 +125,9 @@ namespace IPManagement.API.Services
                 CreatedAt = u.CreatedAt,
                 UpdatedAt = u.UpdatedAt,
                 IsActive = u.IsActive,
-                IPAddressCount = CountIPsForUnit(u.Id)
+                DisplayOrder = u.DisplayOrder,
+                IPAddressCount = CountIPsForUnit(u.Id),
+                TransmissionChannelIds = u.TransmissionChannels?.Select(tc => tc.ChannelId).ToArray() ?? Array.Empty<long>()
             }).ToArray();
         }
 
@@ -199,6 +206,7 @@ namespace IPManagement.API.Services
             var unit = await _context.Units
                 .Include(u => u.ParentUnit)
                 .Include(u => u.ChildUnits)
+                .Include(u => u.TransmissionChannels)
                 .FirstOrDefaultAsync(u => u.Id == unitId);
 
             if (unit == null)
@@ -220,13 +228,15 @@ namespace IPManagement.API.Services
                     CreatedAt = unit.CreatedAt,
                     UpdatedAt = unit.UpdatedAt,
                     IsActive = unit.IsActive,
+                    DisplayOrder = unit.DisplayOrder,
                     ChildUnits = unit.ChildUnits?.Select(c => new UnitDto
                     {
                         Id = c.Id,
                         Name = c.Name,
                         Code = c.Code
                     }).ToArray() ?? Array.Empty<UnitDto>(),
-                    IPAddressCount = unit.IPAddresses.Count
+                    IPAddressCount = unit.IPAddresses.Count,
+                    TransmissionChannelIds = unit.TransmissionChannels?.Select(tc => tc.ChannelId).ToArray() ?? Array.Empty<long>()
                 };
             }
             else
@@ -244,6 +254,7 @@ namespace IPManagement.API.Services
                     CreatedAt = unit.CreatedAt,
                     UpdatedAt = unit.UpdatedAt,
                     IsActive = unit.IsActive,
+                    DisplayOrder = unit.DisplayOrder,
                     ChildUnits = unit.ChildUnits
                         .Where(c => assignedUnitIds.Contains(c.Id))
                         .Select(c => new UnitDto
@@ -252,7 +263,8 @@ namespace IPManagement.API.Services
                             Name = c.Name,
                             Code = c.Code
                         }).ToArray(),
-                    IPAddressCount = unit.IPAddresses.Count
+                    IPAddressCount = unit.IPAddresses.Count,
+                    TransmissionChannelIds = unit.TransmissionChannels?.Select(tc => tc.ChannelId).ToArray() ?? Array.Empty<long>()
                 };
             }
 
@@ -290,6 +302,33 @@ namespace IPManagement.API.Services
             _context.Units.Add(unit);
             await _context.SaveChangesAsync();
 
+            // Xử lý liên kết kênh truyền
+            if (request.TransmissionChannelIds != null && request.TransmissionChannelIds.Length > 0)
+            {
+                foreach (var channelId in request.TransmissionChannelIds)
+                {
+                    var channelExists = await _context.TransmissionChannels.AnyAsync(c => c.Id == channelId);
+                    if (channelExists)
+                    {
+                        // Kiểm tra xem liên kết đã tồn tại chưa
+                        var existingAssignment = await _context.UnitTransmissionChannels
+                            .FirstOrDefaultAsync(utc => utc.UnitId == unit.Id && utc.ChannelId == channelId);
+                        
+                        if (existingAssignment == null)
+                        {
+                            _context.UnitTransmissionChannels.Add(new UnitTransmissionChannel
+                            {
+                                UnitId = unit.Id,
+                                ChannelId = channelId,
+                                AssignedAt = DateTime.UtcNow,
+                                AssignedBy = userId.ToString()
+                            });
+                        }
+                    }
+                }
+                await _context.SaveChangesAsync();
+            }
+
             // Tự động thêm user vào UserUnitAssignments với vai trò Admin của unit này
             var assignment = new UserUnitAssignment
             {
@@ -318,7 +357,9 @@ namespace IPManagement.API.Services
                 Description = unit.Description,
                 Note = unit.Note,
                 CreatedAt = unit.CreatedAt,
-                IsActive = unit.IsActive
+                IsActive = unit.IsActive,
+                DisplayOrder = unit.DisplayOrder,
+                TransmissionChannelIds = unit.TransmissionChannels?.Select(tc => tc.ChannelId).ToArray() ?? Array.Empty<long>()
             };
         }
 
@@ -363,7 +404,34 @@ namespace IPManagement.API.Services
             unit.Description = request.Description;
             unit.Note = request.Note;
             unit.IsActive = request.IsActive;
+            unit.DisplayOrder = request.DisplayOrder;
             unit.UpdatedAt = DateTime.UtcNow;
+
+            // Xử lý liên kết kênh truyền
+            if (request.TransmissionChannelIds != null)
+            {
+                // Xóa các liên kết cũ
+                var existingAssignments = await _context.UnitTransmissionChannels
+                    .Where(utc => utc.UnitId == unitId)
+                    .ToListAsync();
+                _context.UnitTransmissionChannels.RemoveRange(existingAssignments);
+
+                // Thêm các liên kết mới
+                foreach (var channelId in request.TransmissionChannelIds)
+                {
+                    var channelExists = await _context.TransmissionChannels.AnyAsync(c => c.Id == channelId);
+                    if (channelExists)
+                    {
+                        _context.UnitTransmissionChannels.Add(new UnitTransmissionChannel
+                        {
+                            UnitId = unitId,
+                            ChannelId = channelId,
+                            AssignedAt = DateTime.UtcNow,
+                            AssignedBy = userId.ToString()
+                        });
+                    }
+                }
+            }
 
             await _context.SaveChangesAsync();
 
@@ -385,7 +453,9 @@ namespace IPManagement.API.Services
                 Note = unit.Note,
                 CreatedAt = unit.CreatedAt,
                 UpdatedAt = unit.UpdatedAt,
-                IsActive = unit.IsActive
+                IsActive = unit.IsActive,
+                DisplayOrder = unit.DisplayOrder,
+                TransmissionChannelIds = unit.TransmissionChannels?.Select(tc => tc.ChannelId).ToArray() ?? Array.Empty<long>()
             };
         }
 
@@ -507,7 +577,9 @@ namespace IPManagement.API.Services
                 CreatedAt = unit.CreatedAt,
                 UpdatedAt = unit.UpdatedAt,
                 IsActive = unit.IsActive,
-                IPAddressCount = unit.IPAddresses.Count
+                DisplayOrder = unit.DisplayOrder,
+                IPAddressCount = unit.IPAddresses.Count,
+                TransmissionChannelIds = unit.TransmissionChannels?.Select(tc => tc.ChannelId).ToArray() ?? Array.Empty<long>()
             };
         }
 
@@ -777,7 +849,40 @@ namespace IPManagement.API.Services
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to send unit change notification for unit ID '{UnitId}'", unitId);
+                }
+            }
+            
+            public async Task UpdateUnitDisplayOrderAsync(Guid userId, Dictionary<long, int> unitOrderMap)
+            {
+                var user = await _context.Users.FindAsync(userId.ToString());
+                if (user == null)
+                    throw new UnauthorizedAccessException("User not found");
+                
+                if (!await HasPermissionAsync(user, Permissions.UnitUpdate))
+                    throw new UnauthorizedAccessException("You do not have permission to update unit display order");
+                
+                // Update display order for each unit
+                foreach (var kvp in unitOrderMap)
+                {
+                    var unit = await _context.Units.FindAsync(kvp.Key);
+                    if (unit != null)
+                    {
+                        unit.DisplayOrder = kvp.Value;
+                        unit.UpdatedAt = DateTime.UtcNow;
+                    }
+                }
+                
+                await _context.SaveChangesAsync();
+                
+                // Gửi notification
+                var currentUser = await _userManager.FindByIdAsync(userId.ToString());
+                var updatedBy = currentUser?.UserName ?? "Unknown";
+                
+                // Gửi notification cho tất cả units đã cập nhật
+                foreach (var unitId in unitOrderMap.Keys)
+                {
+                    await NotifyUnitChangeAsync(unitId, "OrderUpdated", updatedBy);
+                }
             }
         }
     }
-}

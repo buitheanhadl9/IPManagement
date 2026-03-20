@@ -13,6 +13,7 @@ namespace IPManagement.API.Authorization
         REPORT,          // Báo cáo
         SETTINGS,        // Cài đặt hệ thống
         DRAWING,         // Quản lý bản vẽ
-        NETWORK_SYSTEM   // Quản lý hệ thống mạng
+        NETWORK_SYSTEM,  // Quản lý hệ thống mạng
+        TRANSMISSION_CHANNEL  // Quản lý kênh truyền
     }
 }

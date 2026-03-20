@@ -23,6 +23,8 @@ namespace IPManagement.API.Data
         public DbSet<Drawing> Drawings { get; set; }
         public DbSet<NetworkSystem> NetworkSystems { get; set; }
         public DbSet<NetworkSystemIpAddress> NetworkSystemIpAddresses { get; set; }
+        public DbSet<TransmissionChannel> TransmissionChannels { get; set; }
+        public DbSet<UnitTransmissionChannel> UnitTransmissionChannels { get; set; }
 
         protected override void OnModelCreating(ModelBuilder builder)
         {
@@ -139,6 +141,29 @@ namespace IPManagement.API.Data
                       .WithMany(u => u.CreatedNetworkSystemIpAddresses)
                       .HasForeignKey(e => e.CreatedBy)
                       .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            // Configure TransmissionChannel
+            builder.Entity<TransmissionChannel>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.ExternalId).HasDefaultValueSql("gen_random_uuid()");
+                entity.HasIndex(e => e.Code).IsUnique();
+            });
+
+            // Configure UnitTransmissionChannel (join table for N-N relationship)
+            builder.Entity<UnitTransmissionChannel>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.HasIndex(e => new { e.UnitId, e.ChannelId }).IsUnique();
+                entity.HasOne(e => e.Unit)
+                      .WithMany(u => u.TransmissionChannels)
+                      .HasForeignKey(e => e.UnitId)
+                      .OnDelete(DeleteBehavior.Cascade);
+                entity.HasOne(e => e.Channel)
+                      .WithMany(c => c.UnitAssignments)
+                      .HasForeignKey(e => e.ChannelId)
+                      .OnDelete(DeleteBehavior.Cascade);
             });
         }
 

@@ -11,6 +11,7 @@ import {
   MenuOutlined,
   SettingOutlined,
   GlobalOutlined,
+  WifiOutlined,
 } from '@ant-design/icons';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../hooks/useAppSelector';
@@ -61,6 +62,24 @@ const MainLayout = ({ children }: { children: React.ReactNode }) => {
       });
     }
     
+    // Network Systems - cần NETWORK_SYSTEM_READ
+    if (hasPermission(user, Permissions.NETWORK_SYSTEM_READ)) {
+      menuItems.push({
+        key: '/network-systems',
+        icon: <GlobalOutlined />,
+        label: 'Phân loại mạng',
+      });
+    }
+    
+    // Transmission Channels - cần TRANSMISSION_CHANNEL_READ
+    if (hasPermission(user, Permissions.TRANSMISSION_CHANNEL_READ)) {
+      menuItems.push({
+        key: '/transmission-channels',
+        icon: <WifiOutlined />,
+        label: 'Kênh truyền',
+      });
+    }
+    
     // Users - cần USER_READ
     if (hasPermission(user, Permissions.USER_READ)) {
       menuItems.push({
@@ -76,15 +95,6 @@ const MainLayout = ({ children }: { children: React.ReactNode }) => {
         key: '/roles',
         icon: <TeamOutlined />,
         label: 'Roles',
-      });
-    }
-    
-    // Network Systems - cần NETWORK_SYSTEM_READ
-    if (hasPermission(user, Permissions.NETWORK_SYSTEM_READ)) {
-      menuItems.push({
-        key: '/network-systems',
-        icon: <GlobalOutlined />,
-        label: 'QL hệ thống mạng',
       });
     }
   }
@@ -201,7 +211,7 @@ const MainLayout = ({ children }: { children: React.ReactNode }) => {
         placement="left"
         onClose={() => setMobileMenuOpen(false)}
         open={mobileMenuOpen}
-        width={280}
+        size={280}
         className="mobile-drawer"
         styles={{
           body: { padding: 0 },

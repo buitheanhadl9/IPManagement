@@ -58,8 +58,7 @@ const UsersPage = () => {
 
   // Listen to unit and permissions updates via SignalR
   useEffect(() => {
-    const unsubscribeUnit = signalRService.onUnitUpdated((notification: UnitUpdateNotification) => {
-      console.log('[UsersPage] Received UnitUpdated notification:', notification);
+    const unsubscribeUnit = signalRService.onUnitUpdated((_notification: UnitUpdateNotification) => {
       // Refresh units list and users list when unit changes
       fetchUnits();
       fetchUsers();

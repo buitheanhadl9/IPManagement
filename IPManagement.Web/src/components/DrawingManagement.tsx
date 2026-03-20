@@ -23,9 +23,6 @@ const DrawingManagement: React.FC<DrawingManagementProps> = ({
   canDelete
 }) => {
   const [drawings, setDrawings] = useState<Drawing[]>([]);
-
-  // Debug log
-  console.log('[DrawingManagement] Props:', { unitId, unitName, canCreate, canUpdate, canDelete });
   const [loading, setLoading] = useState(false);
   const [uploadModalVisible, setUploadModalVisible] = useState(false);
   const [editModalVisible, setEditModalVisible] = useState(false);
@@ -63,9 +60,6 @@ const DrawingManagement: React.FC<DrawingManagementProps> = ({
   const handleUpload = async (values: DrawingUploadRequest) => {
     const file = uploadForm.getFieldValue('file');
     
-    console.log('[DrawingManagement] Upload values:', values);
-    console.log('[DrawingManagement] File from form:', file);
-    
     if (!file || !Array.isArray(file) || file.length === 0) {
       message.error('Vui lòng chọn file');
       return;
@@ -73,8 +67,6 @@ const DrawingManagement: React.FC<DrawingManagementProps> = ({
 
     // Ant Design Upload returns file object with originFileObj
     const actualFile = file[0].originFileObj || file[0].raw || file[0];
-    
-    console.log('[DrawingManagement] Actual file:', actualFile);
 
     if (!actualFile) {
       message.error('Không thể đọc file. Vui lòng thử lại.');
@@ -473,8 +465,6 @@ const DrawingManagement: React.FC<DrawingManagementProps> = ({
         onOk={() => {
           editForm.validateFields().then(values => {
             handleEdit(values);
-          }).catch(info => {
-            console.log('Validate Failed:', info);
           });
         }}
         okText="Lưu"
