@@ -15,6 +15,8 @@ export interface Unit {
   childUnits?: Unit[];
   ipAddressCount?: number;
   transmissionChannelIds?: number[];
+  latitude?: number;
+  longitude?: number;
 }
 
 export interface UnitTree {
@@ -35,6 +37,8 @@ export interface UnitCreateRequest {
   description?: string;
   note?: string;
   transmissionChannelIds?: number[];
+  latitude?: number;
+  longitude?: number;
 }
 
 export interface UnitUpdateRequest {
@@ -47,6 +51,8 @@ export interface UnitUpdateRequest {
   isActive: boolean;
   displayOrder?: number;
   transmissionChannelIds?: number[];
+  latitude?: number;
+  longitude?: number;
 }
 
 export interface UnitSelectionDto {

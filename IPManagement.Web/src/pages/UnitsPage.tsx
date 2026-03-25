@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Table, Button, Modal, Form, Input, Select, message, Space, Tag, Card, Row, Col, Typography, Dropdown } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined, SearchOutlined, EnvironmentOutlined, WifiOutlined, FolderOpenOutlined, ToolOutlined, DownOutlined, UpOutlined } from '@ant-design/icons';
+import TruncatedDescription from '../components/TruncatedDescription';
 import type { Unit, UnitCreateRequest, UnitUpdateRequest, TransmissionChannelSelection } from '../types/unit';
 import { unitService } from '../services/unit.service';
 import { useNavigate } from 'react-router-dom';
@@ -8,7 +9,8 @@ import { useAppSelector } from '../hooks/useAppSelector';
 import { hasPermission, Permissions } from '../utils/permissions';
 import { signalRService } from '../services/signalr.service';
 import type { UnitUpdateNotification } from '../types/notification';
-import TruncatedDescription from '../components/TruncatedDescription';
+import GPSLocationButton from '../components/GPSLocationButton';
+import MapLocationPicker from '../components/MapLocationPicker';
 
 const { Title } = Typography;
 const { Search } = Input;
@@ -28,6 +30,28 @@ const UnitsPage = () => {
   const [channelsLoading, setChannelsLoading] = useState(false);
   const navigate = useNavigate();
   const [editingPositionId, setEditingPositionId] = useState<number | null>(null);
+  const [gpsLatitude, setGpsLatitude] = useState<number | undefined>(undefined);
+  const [gpsLongitude, setGpsLongitude] = useState<number | undefined>(undefined);
+  const [gpsAddress, setGpsAddress] = useState<string | undefined>(undefined);
+  const [mapPickerVisible, setMapPickerVisible] = useState(false);
+  const [pageSize, setPageSize] = useState<number>(50);
+  const [current_page, setCurrentPage] = useState<number>(1);
+
+  // Handle GPS location found
+  const handleLocationFound = useCallback((latitude: number, longitude: number, address?: string) => {
+    setGpsLatitude(latitude);
+    setGpsLongitude(longitude);
+    setGpsAddress(address);
+    // Set form field latitude, longitude và address
+    form.setFieldsValue({
+      latitude,
+      longitude
+    });
+    // Always set address if provided (overwriting any existing address)
+    if (address) {
+      form.setFieldValue('address', address);
+    }
+  }, [form]);
 
   // Check permissions based on user permissions - use useMemo to re-calculate when user changes
   // Chỉ check permission khi đã load xong user
@@ -219,6 +243,9 @@ const UnitsPage = () => {
     }
     setEditingId(null);
     form.resetFields();
+    // Reset GPS coordinates
+    setGpsLatitude(undefined);
+    setGpsLongitude(undefined);
     await fetchTransmissionChannels();
     setModalVisible(true);
   };
@@ -230,6 +257,10 @@ const UnitsPage = () => {
     }
     setEditingId(record.id);
     await fetchTransmissionChannels();
+    // Reset GPS coordinates
+    setGpsLatitude(undefined);
+    setGpsLongitude(undefined);
+    setGpsAddress(undefined);
     form.setFieldsValue({
       name: record.name,
       code: record.code,
@@ -239,7 +270,14 @@ const UnitsPage = () => {
       note: record.note,
       isActive: record.isActive,
       transmissionChannelIds: record.transmissionChannelIds || [],
+      latitude: record.latitude,
+      longitude: record.longitude
     });
+    // Load GPS coordinates from record if available
+    if (record.latitude != null && record.longitude != null && typeof record.latitude === 'number' && typeof record.longitude === 'number') {
+      setGpsLatitude(record.latitude);
+      setGpsLongitude(record.longitude);
+    }
     setModalVisible(true);
   };
 
@@ -277,7 +315,9 @@ const UnitsPage = () => {
     
     const submitValues = {
       ...values,
-      transmissionChannelIds: channelIds
+      transmissionChannelIds: channelIds,
+      latitude: gpsLatitude,
+      longitude: gpsLongitude
     };
     
     try {
@@ -317,9 +357,7 @@ const UnitsPage = () => {
     return <tr {...restProps}>{children}</tr>;
   };
 
-  // State for showing full address/description in table view
-  const [expandedAddressId, setExpandedAddressId] = useState<number | null>(null);
-  const [expandedDescriptionId, setExpandedDescriptionId] = useState<number | null>(null);
+  // No longer needed - using Modal for address
 
   const columns = [
     {
@@ -382,50 +420,27 @@ const UnitsPage = () => {
       title: 'Địa chỉ',
       dataIndex: 'address',
       key: 'address',
-      render: (_address: string | undefined, record: Unit) => {
+      render: (_address: string | undefined) => {
         if (!_address) return '-';
-        const isExpanded = expandedAddressId === record.id;
         return (
-          <Space>
-            {isExpanded ? (
-              <>
-                <span>{_address}</span>
-                <Button
-                  size="small"
-                  onClick={() => setExpandedAddressId(null)}
-                  icon={<UpOutlined />}
-                  iconPosition="end"
-                  style={{
-                    border: '1px solid #d9d9d9',
-                    borderRadius: '4px',
-                    padding: '2px 8px'
-                  }}
-                >
-                  Thu gọn
-                </Button>
-              </>
-            ) : (
-              <>
-                {_address.length > 30 ? (
-                  <Button
-                    size="small"
-                    onClick={() => setExpandedAddressId(record.id)}
-                    icon={<DownOutlined />}
-                    iconPosition="end"
-                    style={{
-                      border: '1px solid #d9d9d9',
-                      borderRadius: '4px',
-                      padding: '2px 8px',
-                      color: '#1890ff'
-                    }}
-                  >
-                    Xem thêm
-                  </Button>
-                ) : (
-                  <span>{_address}</span>
-                )}
-              </>
-            )}
+          <Space wrap>
+            <TruncatedDescription
+              description={_address}
+              maxLength={30}
+              title="Địa chỉ"
+            />
+            <Button
+              size="small"
+              onClick={() => window.open(`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(_address)}`, '_blank')}
+              icon={<EnvironmentOutlined />}
+              style={{ 
+                color: '#1890ff', 
+                border: '1px solid #1890ff',
+                borderRadius: '4px' 
+              }}
+            >
+              Tìm đường
+            </Button>
           </Space>
         );
       },
@@ -441,53 +456,7 @@ const UnitsPage = () => {
       title: 'Mô tả',
       dataIndex: 'description',
       key: 'description',
-      render: (description: string | undefined, record: Unit) => {
-        if (!description) return '-';
-        const isExpanded = expandedDescriptionId === record.id;
-        return (
-          <Space>
-            {isExpanded ? (
-              <>
-                <span style={{ color: '#666' }}>{description}</span>
-                <Button
-                  size="small"
-                  onClick={() => setExpandedDescriptionId(null)}
-                  icon={<UpOutlined />}
-                  iconPosition="end"
-                  style={{
-                    border: '1px solid #d9d9d9',
-                    borderRadius: '4px',
-                    padding: '2px 8px'
-                  }}
-                >
-                  Thu gọn
-                </Button>
-              </>
-            ) : (
-              <>
-                {description.length > 30 ? (
-                  <Button
-                    size="small"
-                    onClick={() => setExpandedDescriptionId(record.id)}
-                    icon={<DownOutlined />}
-                    iconPosition="end"
-                    style={{
-                      border: '1px solid #d9d9d9',
-                      borderRadius: '4px',
-                      padding: '2px 8px',
-                      color: '#1890ff'
-                    }}
-                  >
-                    Xem thêm
-                  </Button>
-                ) : (
-                  <span style={{ color: '#666' }}>{description}</span>
-                )}
-              </>
-            )}
-          </Space>
-        );
-      },
+      render: (description: string | undefined) => <TruncatedDescription description={description} maxLength={20} />,
     },
     {
       title: 'Số IP',
@@ -552,8 +521,6 @@ const UnitsPage = () => {
 
   // UnitCard Component for Mobile View
   const UnitCard = ({ unit }: { unit: Unit }) => {
-    const [showAddress, setShowAddress] = useState(false);
-    const [showDescription, setShowDescription] = useState(false);
 
     return (
       <Card size="small" style={{ marginBottom: 12 }} className="unit-mobile-card">
@@ -576,106 +543,41 @@ const UnitsPage = () => {
               <Space>
                 <strong>Đơn vị cấp trên:</strong> <span>{unit.parentUnitName || 'Root'}</span>
               </Space>
-              <Space>
-                <strong>Địa chỉ:</strong>
-                {unit.address ? (
-                  <>
-                    {showAddress ? (
-                      <>
-                        <span>{unit.address}</span>
-                        <Button
-                          size="small"
-                          onClick={() => setShowAddress(false)}
-                          icon={<UpOutlined />}
-                          iconPosition="end"
-                          style={{
-                            border: '1px solid #d9d9d9',
-                            borderRadius: '4px',
-                            padding: '2px 8px'
-                          }}
-                        >
-                          Thu gọn
-                        </Button>
-                      </>
-                    ) : (
-                      <>
-                        {unit.address.length > 30 ? (
-                          <Button
-                            size="small"
-                            onClick={() => setShowAddress(true)}
-                            icon={<DownOutlined />}
-                            iconPosition="end"
-                            style={{
-                              border: '1px solid #d9d9d9',
-                              borderRadius: '4px',
-                              padding: '2px 8px'
-                            }}
-                          >
-                            Xem thêm
-                          </Button>
-                        ) : (
-                          <span>{unit.address}</span>
-                        )}
-                      </>
-                    )}
-                  </>
-                ) : (
-                  <span>-</span>
-                )}
-              </Space>
+         <Space>
+                  <strong>Địa chỉ:</strong>
+                  {unit.address ? (
+                    <Space wrap>
+                      <TruncatedDescription
+                        description={unit.address}
+                        maxLength={30}
+                        title="Địa chỉ"
+                      />
+                      <Button
+                        size="small"
+                        onClick={() => window.open(`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(unit.address || '')}`, '_blank')}
+                        icon={<EnvironmentOutlined />}
+                        style={{ 
+                          color: '#1890ff', 
+                          border: '1px solid #1890ff',
+                          borderRadius: '4px'
+                        }}
+                      >
+                        Tìm đường
+                      </Button>
+                    </Space>
+                  ) : (
+                    <span>-</span>
+                  )}
+                </Space>
               <Space>
                 <strong>Kênh truyền:</strong> <span style={{ fontSize: 12 }}>{getTransmissionChannelNames(unit.transmissionChannelIds)}</span>
               </Space>
               <Space>
                 <strong>Số IP:</strong> <Tag color="blue">{unit.ipAddressCount || 0}</Tag>
               </Space>
-              <Space>
-                <strong>Mô tả:</strong>
-                {unit.description ? (
-                  <>
-                    {showDescription ? (
-                      <>
-                        <span style={{ color: '#666' }}>{unit.description}</span>
-                        <Button
-                          size="small"
-                          onClick={() => setShowDescription(false)}
-                          icon={<UpOutlined />}
-                          iconPosition="end"
-                          style={{
-                            border: '1px solid #d9d9d9',
-                            borderRadius: '4px',
-                            padding: '2px 8px'
-                          }}
-                        >
-                          Thu gọn
-                        </Button>
-                      </>
-                    ) : (
-                      <>
-                        {unit.description.length > 30 ? (
-                          <Button
-                            size="small"
-                            onClick={() => setShowDescription(true)}
-                            icon={<DownOutlined />}
-                            iconPosition="end"
-                            style={{
-                              border: '1px solid #d9d9d9',
-                              borderRadius: '4px',
-                              padding: '2px 8px'
-                            }}
-                          >
-                            Xem thêm
-                          </Button>
-                        ) : (
-                          <span style={{ color: '#666' }}>{unit.description}</span>
-                        )}
-                      </>
-                    )}
-                  </>
-                ) : (
-                  <span>-</span>
-                )}
-              </Space>
+             <Space>
+                 <strong>Mô tả:</strong> <TruncatedDescription description={unit.description} maxLength={20} />
+               </Space>
             </Space>
           </Col>
 
@@ -771,7 +673,13 @@ const UnitsPage = () => {
             dataSource={filteredUnits}
             rowKey="id"
             loading={loading}
-            pagination={{ pageSize: 50, showSizeChanger: true, showQuickJumper: true }}
+            pagination={{
+              pageSize: pageSize,
+              pageSizeOptions: ['10', '20', '30', '50', '100'],
+              showSizeChanger: true,
+              showQuickJumper: true,
+              current: current_page
+            }}
             scroll={{ x: 1000 }}
             size="small"
             components={{
@@ -779,7 +687,18 @@ const UnitsPage = () => {
                 row: TableRow,
               },
             }}
-            onChange={(_pagination, _filters, sorter) => {
+            onChange={(pagination, _filters, sorter) => {
+              const paginationObj = pagination as any;
+              const pageSize = paginationObj.pageSize;
+              const current = paginationObj.current;
+              
+              if (pageSize) {
+                setPageSize(pageSize);
+              }
+              if (current) {
+                setCurrentPage(current);
+              }
+              
               const sorterObj = sorter as any;
               const columnKey = sorterObj.columnKey || sorterObj.field;
               const order = sorterObj.order;
@@ -822,6 +741,28 @@ const UnitsPage = () => {
           <Form.Item
             name="address"
             label="Địa chỉ"
+            extra={
+              <div style={{ marginTop: 4 }}>
+                <Space wrap>
+                  <GPSLocationButton 
+                    onLocationFound={handleLocationFound} 
+                    onLocationFetched={() => setMapPickerVisible(true)}
+                    size="small" 
+                    showMapsButton={false} 
+                  />
+                  {(gpsLatitude != null && gpsLongitude != null && typeof gpsLatitude === 'number' && typeof gpsLongitude === 'number') && (
+                    <span style={{ fontSize: '12px', color: '#666' }}>
+                      Tọa độ: {gpsLatitude.toFixed(6)}, {gpsLongitude.toFixed(6)}
+                    </span>
+                  )}
+                </Space>
+                {gpsAddress && (
+                  <div style={{ fontSize: '12px', color: '#1890ff', marginTop: 4 }}>
+                    📍 {gpsAddress}
+                  </div>
+                )}
+              </div>
+            }
           >
             <Input placeholder="e.g., 123 Đường XYZ, Phường..." />
           </Form.Item>
@@ -884,6 +825,14 @@ const UnitsPage = () => {
           </Form.Item>
         </Form>
       </Modal>
+
+      <MapLocationPicker
+        visible={mapPickerVisible}
+        onCancel={() => setMapPickerVisible(false)}
+        onSelect={handleLocationFound}
+        initialLat={gpsLatitude}
+        initialLng={gpsLongitude}
+      />
     </div>
   );
 };

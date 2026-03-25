@@ -125,6 +125,13 @@ builder.Services.AddScoped<IPermissionNotificationService, PermissionNotificatio
 builder.Services.AddScoped<IDrawingService, DrawingService>();
 builder.Services.AddScoped<INetworkSystemService, NetworkSystemService>();
 builder.Services.AddScoped<ITransmissionChannelService, TransmissionChannelService>();
+builder.Services.AddScoped<IGeocodingService, GeocodingService>();
+
+// Register HttpClient for GeocodingService
+builder.Services.AddHttpClient<IGeocodingService, GeocodingService>(client =>
+{
+    client.DefaultRequestHeaders.Add("User-Agent", "IPManagementApp/1.0");
+});
 
 // Configure SignalR
 builder.Services.AddSignalR(options =>

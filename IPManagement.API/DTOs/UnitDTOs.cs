@@ -24,6 +24,10 @@ namespace IPManagement.API.DTOs
         public string? Note { get; set; }
 
         public long[]? TransmissionChannelIds { get; set; }
+
+        public decimal? Latitude { get; set; }
+
+        public decimal? Longitude { get; set; }
     }
 
     public class UnitUpdateRequest
@@ -51,6 +55,10 @@ namespace IPManagement.API.DTOs
         public int DisplayOrder { get; set; } = 0;
     
         public long[]? TransmissionChannelIds { get; set; }
+
+        public decimal? Latitude { get; set; }
+
+        public decimal? Longitude { get; set; }
     }
 
     public class UnitDto
@@ -71,6 +79,8 @@ namespace IPManagement.API.DTOs
         public UnitDto[]? ChildUnits { get; set; }
         public int IPAddressCount { get; set; }
         public long[]? TransmissionChannelIds { get; set; }
+        public decimal? Latitude { get; set; }
+        public decimal? Longitude { get; set; }
     }
 
     public class UnitTreeDto

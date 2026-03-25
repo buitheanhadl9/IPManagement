@@ -7,11 +7,13 @@ const { Text } = Typography;
 interface TruncatedDescriptionProps {
   description: string | undefined;
   maxLength?: number;
+  title?: string;
 }
 
 const TruncatedDescription: React.FC<TruncatedDescriptionProps> = ({
   description,
-  maxLength = 50,
+  maxLength = 20,
+  title = 'Mô tả',
 }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
 
@@ -20,28 +22,37 @@ const TruncatedDescription: React.FC<TruncatedDescriptionProps> = ({
   }
 
   const isTruncated = description.length > maxLength;
-  const truncatedText = isTruncated ? description.slice(0, maxLength) + '...' : description;
+
+  // Button style consistent across both modes
+  const buttonStyle = {
+    padding: '6px 16px',
+    height: 'auto',
+    flex: '0 0 auto',
+    backgroundColor: '#69b1ff',
+    borderColor: '#69b1ff',
+    color: '#ffffff',
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: '14px',
+  };
 
   return (
     <>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-        <Text style={{ maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {truncatedText}
-        </Text>
-        {isTruncated && (
-          <Button
-            type="link"
-            size="small"
-            icon={<ExpandOutlined />}
-            onClick={() => setIsModalOpen(true)}
-            style={{ padding: 0, height: 'auto' }}
-          >
-            Xem thêm
-          </Button>
-        )}
-      </div>
+      {isTruncated ? (
+        <Button
+          type="primary"
+          size="middle"
+          onClick={() => setIsModalOpen(true)}
+          style={buttonStyle}
+        >
+          Xem thêm
+        </Button>
+      ) : (
+        <Text>{description}</Text>
+      )}
       <Modal
-        title="Mô tả"
+        title={title}
         open={isModalOpen}
         onCancel={() => setIsModalOpen(false)}
         footer={null}

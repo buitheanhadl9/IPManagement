@@ -26,11 +26,13 @@ const IPManagementPage = () => {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [form] = Form.useForm();
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('');
+  const [statusFilter, setStatusFilter] = useState<string | undefined>(undefined);
   const [unitIdFilter, setUnitIdFilter] = useState<number | null>(null);
-  const [units, setUnits] = useState<{ id: number; name: string }[]>([]);
+  const [units, setUnits] = useState<{ id: number; name: string; parentUnitName?: string }[]>([]);
   const [networkSystems, setNetworkSystems] = useState<NetworkSystem[]>([]);
   const [networkSystemsLoading, setNetworkSystemsLoading] = useState(false);
+  const [pageSize, setPageSize] = useState<number>(10);
+  const [current_page, setCurrentPage] = useState<number>(1);
   
   // Check permissions (dùng Unified Roles - level cao nhất trong units áp dụng toàn hệ thống)
   // Chỉ check permission khi đã load xong user
@@ -72,7 +74,7 @@ const IPManagementPage = () => {
   const fetchUnits = async () => {
     try {
       const response = await unitService.getAllUnits();
-      setUnits(response.map((u: Unit) => ({ id: u.id, name: u.name })));
+      setUnits(response.map((u: Unit) => ({ id: u.id, name: u.name, parentUnitName: u.parentUnitName })));
     } catch (error) {
       console.error('Failed to fetch units:', error);
     }
@@ -207,7 +209,10 @@ const IPManagementPage = () => {
       dataIndex: 'unitName',
       key: 'unitName',
       width: 150,
-      render: (unitName: string | undefined) => unitName || '-',
+      render: (unitName: string | undefined, record: IPAddress) => {
+        if (!unitName) return '-';
+        return record.parentUnitName ? `${unitName}, ${record.parentUnitName}` : unitName;
+      },
       resizable: true,
     },
     {
@@ -223,7 +228,7 @@ const IPManagementPage = () => {
       dataIndex: 'description',
       key: 'description',
       width: 200,
-      render: (desc: string | undefined) => <TruncatedDescription description={desc} />,
+      render: (desc: string | undefined) => <TruncatedDescription description={desc} maxLength={20} />,
       resizable: true,
     },
     {
@@ -321,9 +326,10 @@ const IPManagementPage = () => {
                 </Space>
               )}
               {ip.description && (
-                <Space>
-                  <span style={{ color: '#666' }}>Note: {ip.description}</span>
-                </Space>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                  <span style={{ color: '#666' }}>Note:</span>
+                  <TruncatedDescription description={ip.description} maxLength={20} />
+                </div>
               )}
             </Space>
           </Col>
@@ -436,15 +442,15 @@ const IPManagementPage = () => {
               prefix={<SearchOutlined />}
             />
             <Select
-              placeholder="Lọc theo trạng thái"
+              placeholder="Trạng thái"
               allowClear
               value={statusFilter}
               onChange={setStatusFilter}
               style={{ width: 150 }}
             >
-              <Select.Option value="Active">Active</Select.Option>
-              <Select.Option value="Reserved">Reserved</Select.Option>
-              <Select.Option value="Inactive">Inactive</Select.Option>
+              <Select.Option value="Active">Hoạt động</Select.Option>
+              <Select.Option value="Reserved">Đã giữ</Select.Option>
+              <Select.Option value="Inactive">Không hoạt động</Select.Option>
             </Select>
             <Select
               placeholder="Lọc theo đơn vị"
@@ -454,7 +460,9 @@ const IPManagementPage = () => {
               style={{ width: 200 }}
             >
               {units.map(unit => (
-                <Select.Option key={unit.id} value={unit.id}>{unit.name}</Select.Option>
+                <Select.Option key={unit.id} value={unit.id}>
+                  {unit.parentUnitName ? `${unit.name}, ${unit.parentUnitName}` : unit.name}
+                </Select.Option>
               ))}
             </Select>
             <Button icon={<ReloadOutlined />} onClick={fetchIPAddresses}>
@@ -489,8 +497,23 @@ const IPManagementPage = () => {
               dataSource={ipAddresses}
               rowKey="id"
               loading={loading}
-              pagination={{ pageSize: 10 }}
+              pagination={{
+                pageSize: pageSize,
+                pageSizeOptions: ['10', '20', '30', '50', '100'],
+                showSizeChanger: true,
+                showQuickJumper: true,
+                current: current_page
+              }}
               scroll={{ x: 1200 }}
+              onChange={(pagination) => {
+                const paginationObj = pagination as any;
+                if (paginationObj.pageSize) {
+                  setPageSize(paginationObj.pageSize);
+                }
+                if (paginationObj.current) {
+                  setCurrentPage(paginationObj.current);
+                }
+              }}
               rowClassName={(record) => {
                 // Check if this IP address is duplicated within the same unit
                 const duplicateIPs = ipAddresses.filter(
@@ -532,7 +555,9 @@ const IPManagementPage = () => {
           >
             <Select placeholder="Chọn đơn vị" showSearch optionFilterProp="children">
               {units.map(unit => (
-                <Select.Option key={unit.id} value={unit.id}>{unit.name}</Select.Option>
+                <Select.Option key={unit.id} value={unit.id}>
+                  {unit.parentUnitName ? `${unit.name}, ${unit.parentUnitName}` : unit.name}
+                </Select.Option>
               ))}
             </Select>
           </Form.Item>

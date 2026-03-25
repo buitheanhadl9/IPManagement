@@ -69,6 +69,7 @@ namespace IPManagement.API.DTOs
         public Guid ExternalId { get; set; }
         public long UnitId { get; set; }
         public string? UnitName { get; set; }
+        public string? ParentUnitName { get; set; }
         public string IpAddress { get; set; } = string.Empty;
         public string? MacAddress { get; set; }
         public string? DeviceName { get; set; }

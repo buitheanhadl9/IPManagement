@@ -32,17 +32,20 @@ namespace IPManagement.API.Services
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly IHubContext<NotificationHub> _hubContext;
         private readonly ILogger<UnitService> _logger;
+        private readonly IGeocodingService? _geocodingService;
 
         public UnitService(
             ApplicationDbContext context,
             UserManager<ApplicationUser> userManager,
             IHubContext<NotificationHub> hubContext,
-            ILogger<UnitService> logger)
+            ILogger<UnitService> logger,
+            IGeocodingService? geocodingService = null)
         {
             _context = context;
             _userManager = userManager;
             _hubContext = hubContext;
             _logger = logger;
+            _geocodingService = geocodingService;
         }
 
         public async Task<UnitDto[]> GetAllUnitsAsync(Guid userId)
@@ -296,8 +299,30 @@ namespace IPManagement.API.Services
                 ParentUnitId = request.ParentUnitId,
                 Description = request.Description,
                 Note = request.Note,
-                IsActive = true
+                IsActive = true,
+                Latitude = request.Latitude,
+                Longitude = request.Longitude
             };
+
+            // Nếu có tọa độ GPS và chưa có địa chỉ, gọi reverse geocoding
+            if (request.Latitude.HasValue && request.Longitude.HasValue)
+            {
+                if (string.IsNullOrWhiteSpace(request.Address) && _geocodingService != null)
+                {
+                    try
+                    {
+                        var address = await _geocodingService.ReverseGeocodeAsync(request.Latitude.Value, request.Longitude.Value);
+                        if (!string.IsNullOrWhiteSpace(address))
+                        {
+                            unit.Address = address;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "Reverse geocoding failed for coordinates {Lat}, {Lon}", request.Latitude, request.Longitude);
+                    }
+                }
+            }
 
             _context.Units.Add(unit);
             await _context.SaveChangesAsync();
@@ -359,7 +384,9 @@ namespace IPManagement.API.Services
                 CreatedAt = unit.CreatedAt,
                 IsActive = unit.IsActive,
                 DisplayOrder = unit.DisplayOrder,
-                TransmissionChannelIds = unit.TransmissionChannels?.Select(tc => tc.ChannelId).ToArray() ?? Array.Empty<long>()
+                TransmissionChannelIds = unit.TransmissionChannels?.Select(tc => tc.ChannelId).ToArray() ?? Array.Empty<long>(),
+                Latitude = unit.Latitude,
+                Longitude = unit.Longitude
             };
         }
 
@@ -399,13 +426,46 @@ namespace IPManagement.API.Services
 
             unit.Name = request.Name;
             unit.Code = request.Code;
-            unit.Address = request.Address;
             unit.ParentUnitId = request.ParentUnitId;
             unit.Description = request.Description;
             unit.Note = request.Note;
             unit.IsActive = request.IsActive;
             unit.DisplayOrder = request.DisplayOrder;
             unit.UpdatedAt = DateTime.UtcNow;
+
+            // Xử lý GPS coordinates
+            if (request.Latitude.HasValue && request.Longitude.HasValue)
+            {
+                unit.Latitude = request.Latitude;
+                unit.Longitude = request.Longitude;
+
+                // Nếu có tọa độ GPS và chưa có địa chỉ, gọi reverse geocoding
+                if (string.IsNullOrWhiteSpace(request.Address) && _geocodingService != null)
+                {
+                    try
+                    {
+                        var address = await _geocodingService.ReverseGeocodeAsync(request.Latitude.Value, request.Longitude.Value);
+                        if (!string.IsNullOrWhiteSpace(address))
+                        {
+                            unit.Address = address;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "Reverse geocoding failed for coordinates {Lat}, {Lon}", request.Latitude, request.Longitude);
+                    }
+                }
+                else
+                {
+                    // Sử dụng address từ request
+                    unit.Address = request.Address;
+                }
+            }
+            else
+            {
+                // Không có GPS, sử dụng address từ request
+                unit.Address = request.Address;
+            }
 
             // Xử lý liên kết kênh truyền
             if (request.TransmissionChannelIds != null)
@@ -455,7 +515,9 @@ namespace IPManagement.API.Services
                 UpdatedAt = unit.UpdatedAt,
                 IsActive = unit.IsActive,
                 DisplayOrder = unit.DisplayOrder,
-                TransmissionChannelIds = unit.TransmissionChannels?.Select(tc => tc.ChannelId).ToArray() ?? Array.Empty<long>()
+                TransmissionChannelIds = unit.TransmissionChannels?.Select(tc => tc.ChannelId).ToArray() ?? Array.Empty<long>(),
+                Latitude = unit.Latitude,
+                Longitude = unit.Longitude
             };
         }
 

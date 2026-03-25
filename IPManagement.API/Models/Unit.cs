@@ -47,5 +47,9 @@ namespace IPManagement.API.Models
         public bool IsActive { get; set; } = true;
         
         public int DisplayOrder { get; set; } = 0;
+        
+        public decimal? Latitude { get; set; }
+        
+        public decimal? Longitude { get; set; }
     }
 }

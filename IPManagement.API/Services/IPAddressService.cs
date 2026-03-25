@@ -41,7 +41,7 @@ namespace IPManagement.API.Services
                 return new IPAddressListResponse { Items = Array.Empty<IPAddressDto>() };
 
             var query = _context.IPAddresses
-                .Include(ip => ip.Unit)
+                .Include(ip => ip.Unit).ThenInclude(u => u.ParentUnit)
                 .AsQueryable();
 
             // Load user unit assignments
@@ -115,7 +115,7 @@ namespace IPManagement.API.Services
 
             var totalCount = await query.CountAsync();
             var ipList = await query
-                .Include(ip => ip.Unit)
+                .Include(ip => ip.Unit).ThenInclude(u => u.ParentUnit)
                 .Include(ip => ip.NetworkSystems).ThenInclude(ns => ns.NetworkSystem)
                 .OrderByDescending(ip => ip.CreatedAt)
                 .Skip((pageNumber - 1) * pageSize)
@@ -128,6 +128,7 @@ namespace IPManagement.API.Services
                 ExternalId = ip.ExternalId,
                 UnitId = ip.UnitId,
                 UnitName = ip.Unit == null ? null : ip.Unit.Name,
+                ParentUnitName = ip.Unit?.ParentUnit?.Name,
                 IpAddress = ip.IpAddress,
                 MacAddress = ip.MacAddress,
                 DeviceName = ip.DeviceName,
@@ -155,7 +156,7 @@ namespace IPManagement.API.Services
         public async Task<IPAddressDto?> GetIPAddressByIdAsync(Guid userId, long ipId)
         {
             var ip = await _context.IPAddresses
-                .Include(ip => ip.Unit)
+                .Include(ip => ip.Unit).ThenInclude(u => u.ParentUnit)
                 .Include(ip => ip.NetworkSystems).ThenInclude(ns => ns.NetworkSystem)
                 .FirstOrDefaultAsync(ip => ip.Id == ipId);
 
@@ -171,6 +172,7 @@ namespace IPManagement.API.Services
                 ExternalId = ip.ExternalId,
                 UnitId = ip.UnitId,
                 UnitName = ip.Unit == null ? null : ip.Unit.Name,
+                ParentUnitName = ip.Unit?.ParentUnit?.Name,
                 IpAddress = ip.IpAddress,
                 MacAddress = ip.MacAddress,
                 DeviceName = ip.DeviceName,
@@ -449,7 +451,7 @@ namespace IPManagement.API.Services
                 return Array.Empty<IPAddressDto>();
 
             var query = _context.IPAddresses
-                .Include(ip => ip.Unit)
+                .Include(ip => ip.Unit).ThenInclude(u => u.ParentUnit)
                 .AsQueryable();
 
             if (!await IsAdminAsync(user))
@@ -491,7 +493,8 @@ namespace IPManagement.API.Services
                     Id = ip.Id,
                     IpAddress = ip.IpAddress,
                     DeviceName = ip.DeviceName,
-                    UnitName = ip.Unit == null ? null : ip.Unit.Name
+                    UnitName = ip.Unit == null ? null : ip.Unit.Name,
+                    ParentUnitName = ip.Unit?.ParentUnit?.Name
                 })
                 .ToArray();
 

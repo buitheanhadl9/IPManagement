@@ -3,6 +3,7 @@ export interface IPAddress {
   externalId: string;
   unitId: number;
   unitName?: string;
+  parentUnitName?: string;
   ipAddress: string;
   macAddress?: string;
   deviceName?: string;
